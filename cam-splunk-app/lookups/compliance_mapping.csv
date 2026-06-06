@@ -1,0 +1,10 @@
+rule,framework,authority,desc
+RSA-2048,NIST IR 8547,NIST,Transition to post-quantum cryptography standards
+RSA-KEYGEN,NIST IR 8547,NIST,Transition to post-quantum cryptography standards
+TLS-RSA,NIST IR 8547,NIST,Transition to post-quantum cryptography standards
+RS256,NIST IR 8547,NIST,Transition to post-quantum cryptography standards
+ECDSA-P256,NSA CNSA 2.0,NSA,Commercial National Security Algorithm Suite 2.0
+LEGACY-TLS,CISA PQC Roadmap,CISA,Cryptographic inventory & migration prioritization
+PRE-PQC-LIB,CISA PQC Roadmap,CISA,Cryptographic inventory & migration prioritization
+RSA-OAEP,NIST IR 8547,NIST,Transition to post-quantum cryptography standards
+SHA1,CISA PQC Roadmap,CISA,Cryptographic inventory & migration prioritization

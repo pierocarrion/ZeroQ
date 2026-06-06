@@ -1,0 +1,34 @@
+<dashboard version="1.1">
+  <label>CAM — Compliance</label>
+  <description>Crypto-agility posture mapped to NIST, NSA and CISA deadlines.</description>
+  <row>
+    <panel>
+      <chart>
+        <title>Findings by framework</title>
+        <search>
+          <query>
+| index=crypto_source sourcetype=cam:crypto_finding earliest=-90d
+| lookup cam_compliance_mapping rule OUTPUT framework
+| stats count by framework
+          </query>
+          <earliest>-90d</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="charting.chart">column</option>
+      </chart>
+    </panel>
+    <panel>
+      <table>
+        <title>Findings at risk by rule</title>
+        <search>
+          <query>
+| index=crypto_source sourcetype=cam:crypto_finding earliest=-90d
+| lookup cam_compliance_mapping rule OUTPUT framework, authority, desc
+| stats count by framework, rule, desc
+| sort -count
+          </query>
+        </search>
+      </table>
+    </panel>
+  </row>
+</dashboard>

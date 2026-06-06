@@ -1,0 +1,158 @@
+/* ============================================================
+   Crypto-Agility Monitor — Design System
+   Dark enterprise SOC theme · IBM Plex · quantum-violet accent
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* ---- Surfaces (deep slate) ---- */
+  --bg-0: #090c14;          /* app backdrop */
+  --bg-1: #0e1320;          /* primary panel */
+  --bg-2: #131a2a;          /* raised panel / rows */
+  --bg-3: #1a2336;          /* hover / active */
+  --bg-inset: #0b101b;      /* inset wells, code blocks */
+
+  /* ---- Borders / hairlines ---- */
+  --line: #1e2840;
+  --line-soft: #18203352;
+  --line-strong: #2c3a5c;
+
+  /* ---- Text ---- */
+  --tx-hi: #eef2fb;
+  --tx: #c3ccde;
+  --tx-mut: #8893ab;
+  --tx-dim: #5d6883;
+
+  /* ---- Brand: quantum violet + cyan ---- */
+  --brand: #7b6cff;
+  --brand-2: #9d8bff;
+  --brand-dim: #7b6cff1f;
+  --cyan: #3ad6e6;
+  --cyan-dim: #3ad6e61a;
+
+  /* ---- Risk semantics ---- */
+  --crit: #ff5160;
+  --crit-bg: #ff51601a;
+  --crit-line: #ff51603d;
+  --high: #ff9340;
+  --high-bg: #ff93401a;
+  --high-line: #ff93403d;
+  --warn: #ffd24a;
+  --warn-bg: #ffd24a17;
+  --warn-line: #ffd24a36;
+  --safe: #2fd6a6;
+  --safe-bg: #2fd6a61a;
+  --safe-line: #2fd6a63d;
+
+  /* ---- Radius / shadow ---- */
+  --r-sm: 7px;
+  --r: 11px;
+  --r-lg: 16px;
+  --shadow: 0 1px 0 #ffffff0a inset, 0 14px 40px -18px #000000cc;
+  --glow-brand: 0 0 0 1px var(--brand-dim), 0 10px 40px -10px #7b6cff40;
+
+  --font: 'IBM Plex Sans', system-ui, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--bg-0);
+  color: var(--tx);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+#root { height: 100%; }
+
+::selection { background: var(--brand); color: #fff; }
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: #232e46;
+  border: 3px solid var(--bg-0);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover { background: #303d5c; }
+
+/* ---- Typographic helpers ---- */
+.eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--tx-dim);
+}
+.mono { font-family: var(--mono); }
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* ---- Generic card ---- */
+.card {
+  background: linear-gradient(180deg, var(--bg-1), #0c111c);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow);
+}
+
+/* keyframes */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .35; transform: scale(.82); }
+}
+@keyframes sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(280%); }
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes dash {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes blink-caret {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Content is always visible. No auto-playing entrance animation:
+   throttled/background tabs freeze the animation clock at frame 0,
+   which would leave opacity:0 content stuck invisible. */
+.fade-up { opacity: 1; }
+
+/* Sidebar nav — backgrounds via CSS so React style reconciliation
+   never desyncs from imperative hover mutations. */
+.cam-nav-btn { background: transparent; }
+.cam-nav-btn:hover { background: var(--bg-2); }
+.cam-nav-btn.active { background: var(--brand-dim); box-shadow: inset 0 0 0 1px var(--brand-dim); }
+.cam-nav-btn.active:hover { background: var(--brand-dim); }
+
+/* ---- Landing responsive ---- */
+.cam-landing-nav a:hover { color: var(--tx-hi); }
+@media (max-width: 860px) {
+  .cam-landing-nav { gap: 18px !important; }
+  .cam-metrics { grid-template-columns: 1fr 1fr !important; }
+  .cam-metrics > div { border-left: none !important; padding-left: 0 !important; }
+  .cam-thesis { grid-template-columns: 1fr !important; gap: 16px !important; }
+  .cam-caps { grid-template-columns: 1fr 1fr !important; }
+  .cam-platform { grid-template-columns: 1fr !important; }
+  .cam-step-row { grid-template-columns: 40px 1fr !important; }
+  .cam-step-row > div:nth-child(3) { grid-column: 1 / -1; }
+}
+@media (max-width: 560px) {
+  .cam-landing-nav { display: none !important; }
+  .cam-caps { grid-template-columns: 1fr !important; }
+}

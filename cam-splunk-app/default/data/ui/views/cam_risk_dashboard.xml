@@ -1,0 +1,75 @@
+<dashboard version="1.1">
+  <label>CAM — Risk Dashboard</label>
+  <description>Quantum risk score and exposure breakdown across code, network and PKI.</description>
+  <row>
+    <panel>
+      <single>
+        <title>Quantum Risk Score</title>
+        <search>
+          <query>
+| index=crypto_source sourcetype=cam:crypto_finding earliest=-30d
+| append [| index=crypto_net sourcetype=cam:tls_connection earliest=-7d]
+| stats count by risk, sev
+| eval weight=case(sev="critical" OR risk="critical",100,sev="high" OR risk="high",66,sev="monitor" OR risk="monitor",33,1=1,0)
+| eventstats sum(count) as total
+| eval score=round(sum(weight*count)/total,0)
+| stats first(score) as score
+          </query>
+          <earliest>-24h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="unit">/100</option>
+        <option name="rangeColors">["0x53a051","0x0877a6","0xf8be34","0xf1813f","0xdc4e41"]</option>
+        <option name="rangeValues">[0,25,50,75,100]</option>
+      </single>
+    </panel>
+    <panel>
+      <chart>
+        <title>Risk breakdown</title>
+        <search>
+          <query>
+| index=crypto_source sourcetype=cam:crypto_finding earliest=-30d
+| eval tier=sev
+| append [| index=crypto_net sourcetype=cam:tls_connection earliest=-7d | eval tier=risk]
+| stats count by tier
+| eval tier=upper(substr(tier,1,1)).substr(tier,2)
+          </query>
+          <earliest>-24h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="charting.chart">pie</option>
+      </chart>
+    </panel>
+    <panel>
+      <single>
+        <title>Critical findings (24h)</title>
+        <search>
+          <query>
+| index=crypto_source sourcetype=cam:crypto_finding earliest=-24h sev=critical
+| stats count
+          </query>
+        </search>
+        <option name="rangeColors">["0x53a051","0xdc4e41"]</option>
+        <option name="rangeValues">[0,1]</option>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>Top repos by findings</title>
+        <search>
+          <query>
+| index=crypto_source sourcetype=cam:crypto_finding earliest=-30d
+| stats count by repo, sev
+| eventstats sum(count) as total by repo
+| sort - total
+| head 20
+          </query>
+          <earliest>-30d</earliest>
+          <latest>now</latest>
+        </search>
+      </table>
+    </panel>
+  </row>
+</dashboard>

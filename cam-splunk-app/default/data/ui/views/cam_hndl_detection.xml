@@ -1,0 +1,40 @@
+<dashboard version="1.1">
+  <label>CAM — HNDL Detection</label>
+  <description>Harvest-Now-Decrypt-Later anomaly detection on encrypted egress.</description>
+  <row>
+    <panel>
+      <single>
+        <title>Active anomalies</title>
+        <search>
+          <query>| index=crypto_hndl sourcetype=cam:hndl_event status=active | stats count</query>
+          <earliest>-7d</earliest>
+          <latest>now</latest>
+        </search>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>Max deviation</title>
+        <search>
+          <query>| index=crypto_hndl sourcetype=cam:hndl_event | stats max(deviation) as max_dev</query>
+        </search>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>Flagged destinations</title>
+        <search>
+          <query>
+| index=crypto_hndl sourcetype=cam:hndl_event
+| sort - deviation
+| table _time, dst, asn, geo, volume, baseline, deviation, sessions, status, note
+          </query>
+          <earliest>-7d</earliest>
+          <latest>now</latest>
+        </search>
+      </table>
+    </panel>
+  </row>
+</dashboard>
