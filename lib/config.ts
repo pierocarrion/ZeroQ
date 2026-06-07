@@ -12,6 +12,7 @@ export const config = {
   ai: {
     apiKey: str("ANTHROPIC_API_KEY"),
     model: str("ANTHROPIC_MODEL") ?? "claude-3-5-sonnet-20241022",
+    provider: str("AI_PROVIDER") ?? "anthropic",
     get enabled() { return !!this.apiKey; },
   },
   github: {

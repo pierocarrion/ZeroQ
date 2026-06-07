@@ -1,11 +1,10 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
-import { DATA } from "@/lib/data";
 import {
   TONE, riskTone, Icon, Panel, RiskPill, Tag, Spinner, GradeBadge, ProviderMark, LOG_TONE, linkBtn,
 } from "../primitives";
 import AgentConsole from "../AgentConsole";
-import { apiScan, useScannedRepos, repoStore } from "../client";
+import { apiScan, useScannedRepos, repoStore, useSplunkData } from "../client";
 
 /* ---------------- Real live scanner ---------------- */
 function RealScan({ onResult }) {
@@ -98,11 +97,16 @@ function RealScan({ onResult }) {
 
 /* ---------------- Repository Scanner ---------------- */
 export function Repos({ go }) {
-  const r = DATA.codeRollup;
+  const { data: codeRollup } = useSplunkData("/api/code-rollup");
+  const { data: orgs } = useSplunkData("/api/orgs");
+  const { data: liveRepos } = useSplunkData("/api/repos");
+  const r = codeRollup || { reposTotal: 0, reposScanned: 0, filesScanned: 0, findings: 0, critical: 0, fixablePR: 0 };
   const real = useScannedRepos();
-  const allRepos = [...real, ...DATA.repos];
-  const [sel, setSel] = useState(allRepos[0].repo);
+  const seedRepos = liveRepos || [];
+  const allRepos = [...real, ...seedRepos];
+  const [sel, setSel] = useState(allRepos[0]?.repo || "");
   const [scanning, setScanning] = useState(false);
+  const [showFiles, setShowFiles] = useState(false);
   const repo = allRepos.find((x) => x.repo === sel) || allRepos[0];
   const realFindings = real.reduce((s, x) => s + x.findings, 0);
   const realCrit = real.reduce((s, x) => s + x.critical, 0);
@@ -115,18 +119,24 @@ export function Repos({ go }) {
         <div style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 12.5, color: "var(--tx-mut)" }}>
           <span style={{ width: 7, height: 7, borderRadius: 999, background: "var(--safe)", animation: "pulse-dot 1.8s infinite" }} />
           {real.length > 0
-            ? <span><span style={{ color: "var(--safe)" }}>{real.length} repo{real.length > 1 ? "s" : ""} live-scanned</span> · {r.reposTotal} demo repos across 3 orgs</span>
-            : <span>Last full scan 4m ago · {r.reposTotal} repos across 3 orgs</span>}
+            ? <span><span style={{ color: "var(--safe)" }}>{real.length} repo{real.length > 1 ? "s" : ""} live-scanned</span>{r.reposTotal > 0 && <span> · {r.reposTotal} repos across {(orgs || []).length} orgs</span>}</span>
+            : <span>{r.reposTotal > 0 ? `Last full scan 4m ago · ${r.reposTotal} repos across ${(orgs || []).length} orgs` : "Connect GitHub to scan your organization"}</span>}
         </div>
-        <button onClick={() => setScanning((s) => !s)} style={{ ...linkBtn, padding: "8px 14px", background: scanning ? "var(--bg-2)" : "var(--brand-dim)", color: scanning ? "var(--tx)" : "var(--brand-2)", borderColor: scanning ? "var(--line)" : "var(--brand-dim)" }}>
-          <Icon name="refresh" size={15} /> {scanning ? "Hide scan" : "Simulate org-wide scan"}
-        </button>
       </div>
 
-      {scanning && <AgentConsole steps={DATA.scanRun} title="Scanning organizations" subtitle="GitHub + GitLab · collector → Splunk HEC" />}
+      {real.length === 0 && (orgs || []).length === 0 && seedRepos.length === 0 && (
+        <div className="card" style={{ padding: 32, textAlign: "center" }}>
+          <div style={{ color: "var(--brand-2)", display: "flex", justifyContent: "center", marginBottom: 10 }}><Icon name="inventory" size={32} /></div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--tx-hi)", marginBottom: 6 }}>No repositories connected</div>
+          <div style={{ fontSize: 13.5, color: "var(--tx-mut)", maxWidth: 420, margin: "0 auto 16px", lineHeight: 1.5 }}>
+            Link your GitHub organization to discover and scan all your repos for quantum-vulnerable cryptography.
+          </div>
+          <a href="/onboarding" style={{ ...linkBtn, padding: "9px 15px", background: "var(--brand)", color: "#fff", borderColor: "var(--brand)", textDecoration: "none", display: "inline-flex" }}>Connect GitHub</a>
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
-        {DATA.orgs.map((o) => {
+        {(orgs || []).map((o) => {
           const sc = o.status === "scanning";
           return (
             <div key={o.id} className="card" style={{ padding: 15, display: "flex", alignItems: "center", gap: 13 }}>
@@ -149,7 +159,7 @@ export function Repos({ go }) {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 14 }}>
         {[
           ["Repos scanned", `${r.reposScanned + real.length}`, "brand", "inventory"],
-          ["Files analyzed", "412.8k", "brand", "search"],
+          ["Files analyzed", r.filesScanned ? r.filesScanned.toLocaleString() : "412.8k", "brand", "search"],
           ["Crypto findings", r.findings + realFindings, "high", "alert"],
           ["Critical in code", r.critical + realCrit, "crit", "zap"],
           ["Auto-fixable (PR)", r.fixablePR, "safe", "check"],
@@ -164,68 +174,90 @@ export function Repos({ go }) {
         ))}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1.25fr", gap: 16 }}>
-        <Panel title="Repositories" subtitle={`${allRepos.length} repos${real.length ? ` · ${real.length} live` : ""} · ranked by crypto risk`} pad={0}
-          right={<span style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--tx-mut)" }}><ProviderMark provider="github" size={14} /><ProviderMark provider="gitlab" size={14} /></span>}>
-          <div style={{ display: "flex", flexDirection: "column", maxHeight: 520, overflowY: "auto" }}>
-            {allRepos.map((x) => {
-              const active = x.repo === sel;
-              return (
-                <button key={x.repo} onClick={() => setSel(x.repo)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", cursor: "pointer", textAlign: "left", background: active ? "var(--bg-2)" : "transparent", border: "none", fontFamily: "var(--font)", borderBottom: "1px solid var(--line-soft)", borderLeft: `2px solid ${active ? "var(--brand)" : "transparent"}` }}>
-                  <GradeBadge grade={x.grade} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                      <ProviderMark provider={x.provider} size={13} />
-                      <span className="mono" style={{ fontSize: 12.5, color: "var(--tx-hi)", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{x.repo.split("/").slice(1).join("/") || x.repo}</span>
-                      {x.real && <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".08em", color: "var(--safe)", background: "var(--safe-bg)", border: "1px solid var(--safe-line)", borderRadius: 5, padding: "1px 5px", flexShrink: 0 }}>LIVE</span>}
-                    </div>
-                    <div style={{ fontSize: 11.5, color: "var(--tx-mut)", marginTop: 2 }}>{x.lang} · {x.loc}{x.real ? "" : " LOC"} · {x.owner}</div>
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    {x.findings > 0
-                      ? <div className="mono tnum" style={{ fontSize: 13, fontWeight: 600, color: x.critical > 0 ? "var(--crit)" : "var(--high)" }}>{x.findings} issues</div>
-                      : <div style={{ fontSize: 12, color: "var(--safe)", display: "flex", alignItems: "center", gap: 4 }}><Icon name="check" size={13} />clean</div>}
-                    {x.critical > 0 && <div style={{ fontSize: 11, color: "var(--crit)" }}>{x.critical} critical</div>}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </Panel>
-
-        <Panel pad={0} title={<span className="mono" style={{ fontSize: 13.5 }}>{repo.repo}</span>} subtitle={`${repo.lang} · ${repo.findings} findings · branch ${repo.branch}${repo.real ? " · live scan" : ""}`} right={<GradeBadge grade={repo.grade} size={28} />}>
-          {repo.detail.length === 0 ? (
-            <div style={{ padding: 40, textAlign: "center", color: "var(--tx-mut)" }}>
-              <div style={{ color: "var(--safe)", display: "flex", justifyContent: "center", marginBottom: 10 }}><Icon name="shield" size={32} /></div>
-              No quantum-vulnerable crypto detected. Repository is crypto-agile.
-            </div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", maxHeight: 560, overflowY: "auto" }}>
-              {repo.detail.map((f, i) => {
-                const t = TONE[riskTone[f.sev]];
+      {allRepos.length === 0 ? (
+        <div className="card" style={{ padding: 40, textAlign: "center", color: "var(--tx-mut)" }}>
+          <div style={{ color: "var(--safe)", display: "flex", justifyContent: "center", marginBottom: 10 }}><Icon name="shield" size={32} /></div>
+          No repositories scanned yet. Use the scanner above to analyze a public repo.
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1.25fr", gap: 16 }}>
+          <Panel title="Repositories" subtitle={`${allRepos.length} repos${real.length ? ` · ${real.length} live` : ""} · ranked by crypto risk`} pad={0}
+            right={<span style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--tx-mut)" }}><ProviderMark provider="github" size={14} /><ProviderMark provider="gitlab" size={14} /></span>}>
+            <div style={{ display: "flex", flexDirection: "column", maxHeight: 520, overflowY: "auto" }}>
+              {allRepos.map((x) => {
+                const active = x.repo === sel;
                 return (
-                  <div key={i} style={{ padding: "14px 16px", borderBottom: i === repo.detail.length - 1 ? "none" : "1px solid var(--line-soft)" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 7 }}>
-                      <RiskPill risk={f.sev} small />
-                      <span style={{ fontSize: 13.5, color: "var(--tx-hi)", fontWeight: 500, flex: 1 }}>{f.kind}</span>
+                  <button key={x.repo} onClick={() => setSel(x.repo)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", cursor: "pointer", textAlign: "left", background: active ? "var(--bg-2)" : "transparent", border: "none", fontFamily: "var(--font)", borderBottom: "1px solid var(--line-soft)", borderLeft: `2px solid ${active ? "var(--brand)" : "transparent"}` }}>
+                    <GradeBadge grade={x.grade} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                        <ProviderMark provider={x.provider} size={13} />
+                        <span className="mono" style={{ fontSize: 12.5, color: "var(--tx-hi)", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{x.repo.split("/").slice(1).join("/") || x.repo}</span>
+                        {x.real && <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".08em", color: "var(--safe)", background: "var(--safe-bg)", border: "1px solid var(--safe-line)", borderRadius: 5, padding: "1px 5px", flexShrink: 0 }}>LIVE</span>}
+                      </div>
+                      <div style={{ fontSize: 11.5, color: "var(--tx-mut)", marginTop: 2 }}>{x.lang} · {x.loc}{x.real ? "" : " LOC"} · {x.owner}</div>
                     </div>
-                    <div className="mono" style={{ fontSize: 11.5, color: "var(--tx-mut)", marginBottom: 7 }}>
-                      <span style={{ color: "var(--cyan)" }}>{f.file}</span>:<span style={{ color: "var(--warn)" }}>{f.line}</span>
+                    <div style={{ textAlign: "right" }}>
+                      {x.findings > 0
+                        ? <div className="mono tnum" style={{ fontSize: 13, fontWeight: 600, color: x.critical > 0 ? "var(--crit)" : "var(--high)" }}>{x.findings} issues</div>
+                        : <div style={{ fontSize: 12, color: "var(--safe)", display: "flex", alignItems: "center", gap: 4 }}><Icon name="check" size={13} />clean</div>}
+                      {x.critical > 0 && <div style={{ fontSize: 11, color: "var(--crit)" }}>{x.critical} critical</div>}
                     </div>
-                    <div style={{ background: "var(--bg-inset)", border: `1px solid ${t.line}`, borderRadius: 8, padding: "8px 11px", borderLeft: `2px solid ${t.c}` }}>
-                      <code className="mono" style={{ fontSize: 11.5, color: "var(--tx)", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{f.code}</code>
-                    </div>
-                    <div style={{ display: "flex", gap: 7, alignItems: "flex-start", marginTop: 8 }}>
-                      <span style={{ color: "var(--safe)", marginTop: 1 }}><Icon name="check" size={13} /></span>
-                      <span style={{ fontSize: 12, color: "var(--tx-mut)", lineHeight: 1.5 }}><span style={{ color: "var(--safe)", fontWeight: 600 }}>Fix:</span> {f.fix}</span>
-                    </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
-          )}
-        </Panel>
-      </div>
+          </Panel>
+
+          <Panel pad={0} title={<span className="mono" style={{ fontSize: 13.5 }}>{repo.repo}</span>} subtitle={`${repo.lang} · ${repo.findings} findings · branch ${repo.branch}${repo.real ? " · live scan" : ""}`} right={<GradeBadge grade={repo.grade} size={28} />}>
+            {repo.detail.length === 0 ? (
+              <div style={{ padding: 40, textAlign: "center", color: "var(--tx-mut)" }}>
+                <div style={{ color: "var(--safe)", display: "flex", justifyContent: "center", marginBottom: 10 }}><Icon name="shield" size={32} /></div>
+                No quantum-vulnerable crypto detected. Repository is crypto-agile.
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", maxHeight: 560, overflowY: "auto" }}>
+                {repo.detail.map((f, i) => {
+                  const t = TONE[riskTone[f.sev]];
+                  return (
+                    <div key={i} style={{ padding: "14px 16px", borderBottom: i === repo.detail.length - 1 ? "none" : "1px solid var(--line-soft)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 7 }}>
+                        <RiskPill risk={f.sev} small />
+                        <span style={{ fontSize: 13.5, color: "var(--tx-hi)", fontWeight: 500, flex: 1 }}>{f.kind}</span>
+                      </div>
+                      <div className="mono" style={{ fontSize: 11.5, color: "var(--tx-mut)", marginBottom: 7 }}>
+                        <span style={{ color: "var(--cyan)" }}>{f.file}</span>:<span style={{ color: "var(--warn)" }}>{f.line}</span>
+                      </div>
+                      <div style={{ background: "var(--bg-inset)", border: `1px solid ${t.line}`, borderRadius: 8, padding: "8px 11px", borderLeft: `2px solid ${t.c}` }}>
+                        <code className="mono" style={{ fontSize: 11.5, color: "var(--tx)", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{f.code}</code>
+                      </div>
+                      <div style={{ display: "flex", gap: 7, alignItems: "flex-start", marginTop: 8 }}>
+                        <span style={{ color: "var(--safe)", marginTop: 1 }}><Icon name="check" size={13} /></span>
+                        <span style={{ fontSize: 12, color: "var(--tx-mut)", lineHeight: 1.5 }}><span style={{ color: "var(--safe)", fontWeight: 600 }}>Fix:</span> {f.fix}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {(repo.files || []).length > 0 && (
+              <div style={{ borderTop: "1px solid var(--line)", padding: "14px 16px" }}>
+                <button onClick={() => setShowFiles((s) => !s)} style={{ ...linkBtn, width: "100%", justifyContent: "space-between", border: "none", background: "transparent", padding: 0 }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--tx-hi)" }}>Files analyzed ({repo.scanned} of {repo.fileCount})</span>
+                  <span style={{ color: "var(--tx-mut)", display: "flex" }}><Icon name={showFiles ? "arrowUp" : "arrowDown"} size={14} /></span>
+                </button>
+                {showFiles && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+                    {repo.files.map((f) => (
+                      <span key={f} className="mono" style={{ fontSize: 10.5, color: "var(--tx-mut)", background: "var(--bg-2)", border: "1px solid var(--line)", borderRadius: 6, padding: "3px 8px" }}>{f}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </Panel>
+        </div>
+      )}
 
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <button onClick={() => go("agent")} style={{ ...linkBtn, padding: "9px 15px", background: "var(--brand-dim)", color: "var(--brand-2)", borderColor: "var(--brand-dim)" }}><Icon name="ai" size={15} fill="currentColor" stroke={0} /> See how the AI agent works</button>
@@ -236,8 +268,15 @@ export function Repos({ go }) {
 }
 
 /* ---------------- AI Agent pipeline ---------------- */
+const AGENT_STEPS = [
+  { id: "ingest", label: "Ingest", icon: "globe", tool: "Splunk MCP Server", desc: "Pull org repo tree via GitHub/GitLab API → index to Splunk", detail: "Repos indexed to Splunk" },
+  { id: "detect", label: "Detect", icon: "search", tool: "Hosted model + regex corpus", desc: "Scan source for quantum-vulnerable crypto patterns", detail: "Findings detected" },
+  { id: "correlate", label: "Correlate", icon: "radar", tool: "SPL correlation search", desc: "Join code findings with live TLS telemetry & cert inventory", detail: "code ↔ runtime ↔ PKI" },
+  { id: "reason", label: "Reason", icon: "ai", tool: "Splunk AI Assistant", desc: "Rank by exposure × sensitivity, draft remediation", detail: "risk-weighted plan" },
+  { id: "act", label: "Act", icon: "zap", tool: "Agent actions", desc: "Open fix PRs, file tickets, update crypto policy", detail: "Auto-fixable issues" },
+];
 export function Agent() {
-  const steps = DATA.agentSteps;
+  const steps = AGENT_STEPS;
   const [active, setActive] = useState(0);
   const [running, setRunning] = useState(true);
   useEffect(() => {

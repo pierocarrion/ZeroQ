@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { DATA } from "@/lib/data";
 import { capabilities } from "@/lib/config";
 import { createSplunkClient } from "@/lib/splunk/splunkFactory";
 
@@ -10,17 +9,17 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const caps = capabilities();
-    let source = "seed";
+    let source: string | null = null;
     const summary: {
       riskScore: number;
       band: string;
       lastMonth: number;
       breakdown: { key: string; value: number }[];
     } = {
-      riskScore: DATA.summary.riskScore,
-      band: DATA.summary.riskBand,
-      lastMonth: DATA.summary.lastMonthScore,
-      breakdown: DATA.riskBreakdown.map((b) => ({ key: b.key, value: b.value })),
+      riskScore: 0,
+      band: "—",
+      lastMonth: 0,
+      breakdown: [],
     };
 
     if (caps.splunk) {
@@ -28,7 +27,7 @@ export async function GET() {
       if (live) {
         summary.riskScore = live.riskScore;
         summary.band = live.riskBand;
-        summary.lastMonth = live.lastMonthScore ?? DATA.summary.lastMonthScore;
+        summary.lastMonth = live.lastMonthScore ?? 0;
         summary.breakdown = live.breakdown;
         source = "splunk";
       }
@@ -37,12 +36,12 @@ export async function GET() {
     return NextResponse.json({ ...summary, capabilities: caps, source });
   } catch (e: any) {
     return NextResponse.json({
-      riskScore: DATA.summary.riskScore,
-      band: DATA.summary.riskBand,
-      lastMonth: DATA.summary.lastMonthScore,
-      breakdown: DATA.riskBreakdown.map((b) => ({ key: b.key, value: b.value })),
+      riskScore: 0,
+      band: "—",
+      lastMonth: 0,
+      breakdown: [],
       capabilities: capabilities(),
-      source: "seed",
+      source: null,
       error: e?.message,
     });
   }

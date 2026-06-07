@@ -23,6 +23,7 @@ export class GitLabProvider implements SourceProvider {
     if (!meta.ok) throw new ProviderError("GitLab API error " + meta.status);
     const m = await meta.json();
     const branch: string = m.default_branch || "main";
+    const lastCommit: string = m.last_activity_at ? new Date(m.last_activity_at).toISOString() : "—";
 
     const blobs: any[] = [];
     for (let page = 1; page <= 5; page++) {
@@ -35,7 +36,7 @@ export class GitLabProvider implements SourceProvider {
     }
     const picked = blobs.slice(0, maxFiles);
     const files = await this.fetchFiles(pid, branch, picked.map((b: any) => b.path));
-    return { meta: { fullName: target.path ?? "", provider: "gitlab", branch, language: "—" }, files, totalScannable: blobs.length };
+    return { meta: { fullName: target.path ?? "", provider: "gitlab", branch, language: "—", lastCommit }, files, totalScannable: blobs.length };
   }
 
   private async fetchFiles(pid: string, branch: string, paths: string[]): Promise<SourceFile[]> {

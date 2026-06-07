@@ -3,7 +3,7 @@
 // Read methods return null when unavailable so callers can fall
 // back to local seed data.
 // ============================================================
-import type { IngestResult, ScanResult } from "../types";
+import type { AlgoMixItem, CodeRollup, IngestResult, Org, OrgPlan, RepoSeed, RoadmapPhase, ScanResult, TopAsset } from "../types";
 import type { SplunkSearchResult } from "./SplunkSearchClient";
 
 export type RiskTier = "critical" | "high" | "monitor" | "safe";
@@ -12,6 +12,10 @@ export interface RiskSummary {
   riskScore: number;
   riskBand: string;
   lastMonthScore?: number;
+  endpointsScanned?: number;
+  coverage?: number;
+  connectionsObserved?: number;
+  certsTracked?: number;
   breakdown: { key: RiskTier; value: number }[];
 }
 
@@ -70,6 +74,15 @@ export interface SplunkClient {
   getCertificates(): Promise<Certificate[] | null>;
   getHndlAnomalies(): Promise<HndlAnomaly[] | null>;
   getComplianceStats(): Promise<ComplianceStat[] | null>;
+  getAlgoMix(): Promise<AlgoMixItem[] | null>;
+  getTopAssets(): Promise<TopAsset[] | null>;
+  getRiskTrend(): Promise<number[] | null>;
+  getHndlTimeline(): Promise<number[] | null>;
+  getRoadmap(): Promise<RoadmapPhase[] | null>;
+  getOrgs(): Promise<Org[] | null>;
+  getRepos(): Promise<RepoSeed[] | null>;
+  getCodeRollup(): Promise<CodeRollup | null>;
+  getOrgPlan(org: string): Promise<OrgPlan | null>;
 }
 
 /** Used when Splunk is not configured. Always a clean no-op. */
@@ -84,4 +97,13 @@ export class NoopSplunkClient implements SplunkClient {
   async getCertificates(): Promise<null> { return null; }
   async getHndlAnomalies(): Promise<null> { return null; }
   async getComplianceStats(): Promise<null> { return null; }
+  async getAlgoMix(): Promise<null> { return null; }
+  async getTopAssets(): Promise<null> { return null; }
+  async getRiskTrend(): Promise<null> { return null; }
+  async getHndlTimeline(): Promise<null> { return null; }
+  async getRoadmap(): Promise<null> { return null; }
+  async getOrgs(): Promise<null> { return null; }
+  async getRepos(): Promise<null> { return null; }
+  async getCodeRollup(): Promise<null> { return null; }
+  async getOrgPlan(): Promise<null> { return null; }
 }

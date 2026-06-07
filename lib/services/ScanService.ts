@@ -25,7 +25,7 @@ export class ScanService {
     const provider = this.providerFactory(target.provider);
     const { meta, files, totalScannable } = await provider.loadRepository(target, this.maxFiles);
     const findings = files.flatMap((f) => detect(meta.fullName, f.path, f.content));
-    const result = buildScanResult(meta, totalScannable, files.length, findings);
+    const result = buildScanResult(meta, totalScannable, files.length, findings, files.map((f) => f.path));
     const splunk = this.splunk.enabled ? await this.splunk.sendFindings(result) : null;
     return { result, splunk };
   }

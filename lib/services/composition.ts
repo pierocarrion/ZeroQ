@@ -15,9 +15,9 @@ export function makeScanService(): ScanService {
 }
 
 export function makeAssistantService(): AssistantService {
-  return new AssistantService(createAIProvider());
+  return new AssistantService(createAIProvider(), createSplunkClient());
 }
 
 export function makePlanService(): PlanService {
-  return new PlanService(createAIProvider());
+  return new PlanService(createAIProvider(), createSplunkClient());
 }

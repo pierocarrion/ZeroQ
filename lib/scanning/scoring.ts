@@ -43,7 +43,7 @@ function inferLanguage(findings: Finding[], fallback: string): string {
 }
 
 /** Assemble the API-facing ScanResult from raw findings. */
-export function buildScanResult(meta: RepoMeta, totalScannable: number, scanned: number, findings: Finding[]): ScanResult {
+export function buildScanResult(meta: RepoMeta, totalScannable: number, scanned: number, findings: Finding[], paths: string[] = []): ScanResult {
   return {
     repo: meta.fullName,
     provider: meta.provider,
@@ -60,7 +60,8 @@ export function buildScanResult(meta: RepoMeta, totalScannable: number, scanned:
     fileCount: totalScannable,
     risk: riskScore(findings, totalScannable),
     detail: findings.slice(0, 60).map(({ file, line, kind, sev, code, fix }) => ({ file, line, kind, sev, code, fix })),
-    lastCommit: "just scanned",
+    files: paths,
+    lastCommit: meta.lastCommit,
     real: true,
   };
 }

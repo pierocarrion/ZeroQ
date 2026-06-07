@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSplunkClient } from "@/lib/splunk/splunkFactory";
-import { DATA } from "@/lib/data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,8 +18,8 @@ export async function GET(req: NextRequest) {
     if (live && live.length > 0) {
       return NextResponse.json({ data: live, source: "splunk" });
     }
-    return NextResponse.json({ data: DATA.inventory, source: "seed" });
+    return NextResponse.json({ data: null, source: null });
   } catch (e: any) {
-    return NextResponse.json({ data: DATA.inventory, source: "seed", error: e?.message }, { status: 200 });
+    return NextResponse.json({ data: null, source: null, error: e?.message }, { status: 200 });
   }
 }

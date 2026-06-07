@@ -7,6 +7,7 @@ import { AIProvider } from "./AIProvider";
 
 export class AnthropicProvider implements AIProvider {
   readonly live = true;
+  readonly name = "Anthropic Claude";
 
   async complete(req: AICompletionRequest): Promise<string> {
     const res = await fetch("https://api.anthropic.com/v1/messages", {

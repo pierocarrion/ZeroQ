@@ -85,8 +85,9 @@ export function Logo({ size = 30 }) {
 }
 
 export function RiskPill({ risk, small }) {
-  const t = TONE[riskTone[risk] || risk] || TONE.brand;
-  const label = risk.charAt(0).toUpperCase() + risk.slice(1);
+  const r = risk || "monitor";
+  const t = TONE[riskTone[r] || r] || TONE.brand;
+  const label = r.charAt(0).toUpperCase() + r.slice(1);
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: small ? "2px 8px" : "3px 10px",
       borderRadius: 999, fontSize: small ? 11 : 12, fontWeight: 600, color: t.c, background: t.bg, border: `1px solid ${t.line}` }}>
@@ -174,7 +175,7 @@ export function Gauge({ value, band, size = 196 }) {
       <circle cx={nx} cy={ny} r="7" fill="#0e1320" stroke={bandColor} strokeWidth="3" />
       <text x={cx} y={cy - 6} textAnchor="middle" fontFamily="var(--mono)" fontWeight="600" fontSize="42" fill="var(--tx-hi)">{value}</text>
       <text x={cx} y={cy + 18} textAnchor="middle" fontSize="12.5" fill="var(--tx-mut)" letterSpacing="1.5">/ 100</text>
-      <text x={cx} y={cy + 40} textAnchor="middle" fontSize="13.5" fontWeight="700" fill={bandColor} letterSpacing=".06em">{band.toUpperCase()} EXPOSURE</text>
+      <text x={cx} y={cy + 40} textAnchor="middle" fontSize="13.5" fontWeight="700" fill={bandColor} letterSpacing=".06em">{(band || "—").toUpperCase()} EXPOSURE</text>
     </svg>
   );
 }
@@ -200,14 +201,23 @@ export function Donut({ data, size = 150, thickness = 18 }) {
 
 export function AreaChart({ data, height = 120, color = "var(--brand)", highlight }) {
   const w = 600;
-  const max = Math.max(...data) * 1.12;
-  const min = Math.min(...data, 0);
+  const sanitized = (Array.isArray(data) ? data : []).map((v) => (typeof v === "number" && !isNaN(v) ? v : 0));
+  if (sanitized.length === 0) {
+    return (
+      <svg width="100%" height={height + 22} viewBox={`0 0 ${w} ${height + 22}`} preserveAspectRatio="none">
+        {[0.25, 0.5, 0.75].map((g) => <line key={g} x1="0" y1={height * g} x2={w} y2={height * g} stroke="#ffffff08" strokeWidth="1" />)}
+        <text x={w / 2} y={(height + 22) / 2} fill="var(--tx-mut)" fontSize="12" textAnchor="middle">No data</text>
+      </svg>
+    );
+  }
+  const max = Math.max(...sanitized) * 1.12;
+  const min = Math.min(...sanitized, 0);
   const span = max - min || 1;
-  const x = (i) => (i / (data.length - 1)) * w;
+  const x = (i) => (i / (sanitized.length - 1)) * w;
   const y = (v) => height - ((v - min) / span) * height;
-  const line = data.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  const line = sanitized.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
   const area = `0,${height} ${line} ${w},${height}`;
-  const gid = "area-" + Math.round(color.length * 7 + data.length);
+  const gid = "area-" + Math.round(color.length * 7 + sanitized.length);
   return (
     <svg width="100%" height={height + 22} viewBox={`0 0 ${w} ${height + 22}`} preserveAspectRatio="none">
       <defs>
@@ -219,7 +229,7 @@ export function AreaChart({ data, height = 120, color = "var(--brand)", highligh
       {highlight && <rect x={x(highlight[0])} y="0" width={x(highlight[1]) - x(highlight[0])} height={height} fill="var(--crit)" opacity=".09" />}
       <polygon points={area} fill={`url(#${gid})`} />
       <polyline points={line} fill="none" stroke={color} strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round" />
-      <circle cx={x(data.length - 1)} cy={y(data[data.length - 1])} r="3.5" fill={color} />
+      <circle cx={x(sanitized.length - 1)} cy={y(sanitized[sanitized.length - 1])} r="3.5" fill={color} />
     </svg>
   );
 }

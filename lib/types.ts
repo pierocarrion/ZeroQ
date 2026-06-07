@@ -26,6 +26,7 @@ export interface RepoMeta {
   provider: Provider;
   branch: string;
   language: string;
+  lastCommit: string;
 }
 
 /** What a provider returns from loadRepository(). */
@@ -66,8 +67,103 @@ export interface ScanResult {
   fileCount: number;
   risk: number;
   detail: FindingDetail[];
+  files: string[];
   lastCommit: string;
   real: true;
+}
+
+export interface AlgoMixItem {
+  algo: string;
+  pct: number;
+  risk: RiskTier;
+}
+
+export interface TopAsset {
+  name: string;
+  risk: RiskTier;
+  algo: string;
+  hosts: number;
+  txns: string;
+  sensitivity: string;
+}
+
+export interface RoadmapItem {
+  asset: string;
+  action: string;
+  effort: string;
+  impact: string;
+  why: string;
+}
+
+export interface RoadmapPhase {
+  phase: string;
+  window: string;
+  tone: "crit" | "high" | "safe";
+  items: RoadmapItem[];
+}
+
+export interface Org {
+  id: string;
+  provider: Provider;
+  name: string;
+  repos: number;
+  scanned: number;
+  lastScan: string;
+  status: "connected" | "scanning";
+  stars: string;
+  members: number;
+}
+
+export interface RepoSeed {
+  repo: string;
+  provider: Provider;
+  lang: string;
+  loc: string;
+  grade: string;
+  findings: number;
+  critical: number;
+  lastCommit: string;
+  branch: string;
+  owner: string;
+  detail: FindingDetail[];
+}
+
+export interface CodeRollup {
+  reposScanned: number;
+  reposTotal: number;
+  filesScanned: number;
+  findings: number;
+  critical: number;
+  high: number;
+  monitor: number;
+  fixablePR: number;
+  avgGrade: string;
+  byLang: { lang: string; findings: number; color: string }[];
+  patterns: { pattern: string; count: number; sev: Severity }[];
+}
+
+export interface PlanAction {
+  repo: string;
+  task: string;
+  pr: string;
+  effort: string;
+}
+
+export interface PlanStream {
+  title: string;
+  tone: "crit" | "high" | "safe";
+  window: string;
+  actions: PlanAction[];
+}
+
+export interface OrgPlan {
+  org: string;
+  generated: string;
+  summary: string;
+  posture: string;
+  targetPosture: string;
+  weeks: number;
+  streams: PlanStream[];
 }
 
 export interface IngestResult {

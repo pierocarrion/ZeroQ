@@ -1,6 +1,5 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
-import { DATA } from "@/lib/data";
 import { TONE, riskTone, Icon, Panel, Tag, Bar, MdLite } from "../primitives";
 import { apiAssistant, apiSplunkQuery, useScannedRepos, useSplunkData } from "../client";
 
@@ -74,7 +73,7 @@ export function Assistant() {
   };
 
   const asked = msgs.filter((m) => m.role === "user").map((m) => m.text);
-  const remaining = DATA.aiSuggestions.filter((s) => !asked.includes(s));
+  const remaining = ["Which of our APIs are still using RSA?", "Show servers not yet on TLS 1.3", "What changed in our quantum risk score this month?", "Which certificates expire in under 90 days?"].filter((s) => !asked.includes(s));
 
   return (
     <div className="fade-up" style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
@@ -145,8 +144,25 @@ export function Assistant() {
 
 /* ---------------- Roadmap ---------------- */
 export function Roadmap() {
+  const { data: roadmap, source } = useSplunkData("/api/roadmap");
+  const phases = roadmap || [];
+  if (phases.length === 0) return (
+    <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div className="card" style={{ padding: 40, textAlign: "center" }}>
+        <div style={{ color: "var(--safe)", display: "flex", justifyContent: "center", marginBottom: 10 }}><Icon name="roadmap" size={32} /></div>
+        <div style={{ fontSize: 15, fontWeight: 600, color: "var(--tx-hi)", marginBottom: 6 }}>No roadmap data available</div>
+        <div style={{ fontSize: 13.5, color: "var(--tx-mut)", maxWidth: 420, margin: "0 auto 16px", lineHeight: 1.5 }}>
+          Generate an AI-powered migration roadmap after connecting Splunk and scanning repositories.
+        </div>
+        <a href="/onboarding" style={{ ...linkBtn, padding: "9px 15px", background: "var(--brand)", color: "#fff", borderColor: "var(--brand)", textDecoration: "none", display: "inline-flex" }}>Start setup</a>
+      </div>
+    </div>
+  );
   return (
     <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <SourceBadge source={source} />
+      </div>
       <div className="card" style={{ padding: 18, display: "flex", gap: 14, alignItems: "flex-start", background: "linear-gradient(110deg, #131229, #0e1320 60%)", borderColor: "var(--brand-dim)" }}>
         <div style={{ width: 38, height: 38, borderRadius: 10, background: "var(--brand-dim)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--brand-2)" }}><Icon name="ai" size={20} fill="currentColor" stroke={0} /></div>
         <div>
@@ -154,11 +170,11 @@ export function Roadmap() {
             <span style={{ fontWeight: 600, color: "var(--tx-hi)", fontSize: 15 }}>AI-generated migration roadmap</span>
             <Tag tone="brand">auto-prioritized</Tag>
           </div>
-          <div style={{ fontSize: 13, color: "var(--tx-mut)", lineHeight: 1.6, maxWidth: 760 }}>{DATA.roadmapNote}</div>
+          <div style={{ fontSize: 13, color: "var(--tx-mut)", lineHeight: 1.6, maxWidth: 760 }}>Migration is a configuration and policy effort — measured in engineer-days, not the millions in capital that quantum hardware costs. The economic asymmetry favors defenders who start now.</div>
         </div>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        {DATA.roadmap.map((phase, pi) => {
+        {phases.map((phase, pi) => {
           const t = TONE[phase.tone];
           return (
             <div key={pi} className="card" style={{ overflow: "hidden" }}>
@@ -195,8 +211,22 @@ export function Roadmap() {
 /* ---------------- Compliance ---------------- */
 export function Compliance() {
   const stateTone = { past: "safe", active: "brand", target: "high" };
-  const { data: liveStats, source } = useSplunkData("/api/compliance", DATA.compliance);
-  const frameworks = liveStats && liveStats.length ? liveStats : DATA.compliance;
+  const { data: liveStats, source } = useSplunkData("/api/compliance");
+  const { data: rollup } = useSplunkData("/api/code-rollup");
+  const frameworks = liveStats || [];
+  const r = rollup || {};
+  if (frameworks.length === 0) return (
+    <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div className="card" style={{ padding: 40, textAlign: "center" }}>
+        <div style={{ color: "var(--safe)", display: "flex", justifyContent: "center", marginBottom: 10 }}><Icon name="shield" size={32} /></div>
+        <div style={{ fontSize: 15, fontWeight: 600, color: "var(--tx-hi)", marginBottom: 6 }}>No compliance data available</div>
+        <div style={{ fontSize: 13.5, color: "var(--tx-mut)", maxWidth: 420, margin: "0 auto 16px", lineHeight: 1.5 }}>
+          Compliance mappings are built from your indexed findings in Splunk. Connect your instance to start tracking.
+        </div>
+        <a href="/onboarding" style={{ ...linkBtn, padding: "9px 15px", background: "var(--brand)", color: "#fff", borderColor: "var(--brand)", textDecoration: "none", display: "inline-flex" }}>Connect Splunk</a>
+      </div>
+    </div>
+  );
   return (
     <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -250,8 +280,8 @@ export function Compliance() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
           {[
             ["Window to NSA 2035 deadline", "8.7 yrs", "Migration takes 5–10 — start now", "high"],
-            ["Quantum-vulnerable assets", "218", "across RSA + ECC key exchange", "crit"],
-            ["Already PQC-ready", "12%", "TLS 1.3 + ML-KEM hybrid", "safe"],
+            ["Quantum-vulnerable assets", String(r.findings + r.critical + r.high), "across RSA + ECC key exchange", "crit"],
+            ["Already PQC-ready", String(Math.round((r.patterns?.filter((p) => p.sev === "safe")?.length || 1) * 100 / Math.max(1, r.patterns?.length || 1))) + "%", "TLS 1.3 + ML-KEM hybrid", "safe"],
             ["Frameworks tracked", String(frameworks.length), "NIST · NSA · CISA", "brand"],
           ].map(([k, v, s, tone]) => (
             <div key={k} style={{ padding: 14, background: "var(--bg-inset)", borderRadius: 11, border: "1px solid var(--line)" }}>

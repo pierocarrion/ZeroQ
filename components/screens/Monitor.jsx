@@ -1,6 +1,5 @@
 "use client";
 import React, { useState } from "react";
-import { DATA } from "@/lib/data";
 import { useSplunkData } from "../client";
 import {
   TONE, riskTone, Icon, Panel, RiskPill, Tag, Delta, Gauge, Donut, AreaChart,
@@ -20,8 +19,9 @@ function SourceBadge({ source }) {
 
 /* ---------------- HNDL banner ---------------- */
 function HndlBanner({ onView }) {
-  const { data: anomalies } = useSplunkData("/api/hndl", DATA.hndlAnomalies);
-  const a = anomalies && anomalies.length ? anomalies[0] : DATA.hndlAnomalies[0];
+  const { data: anomalies } = useSplunkData("/api/hndl");
+  const a = anomalies && anomalies.length ? anomalies[0] : null;
+  if (!a) return null;
   return (
     <div className="card" style={{ borderColor: "var(--crit-line)", background: "linear-gradient(110deg, #1a0f17, #0e1320 55%)", padding: "16px 20px", display: "flex", alignItems: "center", gap: 18, position: "relative", overflow: "hidden" }}>
       <div style={{ position: "absolute", inset: 0, background: "radial-gradient(420px 90px at 8% 50%, var(--crit-bg), transparent 70%)", pointerEvents: "none" }} />
@@ -45,23 +45,32 @@ function HndlBanner({ onView }) {
 
 /* ---------------- Dashboard ---------------- */
 export function Dashboard({ go }) {
-  const { data: riskData, source } = useSplunkData("/api/risk", {
-    riskScore: DATA.summary.riskScore,
-    band: DATA.summary.riskBand,
-    lastMonth: DATA.summary.lastMonthScore,
-    breakdown: DATA.riskBreakdown.map((b) => ({ key: b.key, value: b.value })),
-  });
-  const s = { ...DATA.summary, ...riskData, riskBand: riskData.band || DATA.summary.riskBand };
-  const legend = s.breakdown.map((b) => ({ ...b, label: DATA.RISK[b.key]?.label || b.key, color: DATA.RISK[b.key]?.color || "var(--tx-dim)" }));
+  const { data: riskData, source } = useSplunkData("/api/risk");
+  const s = riskData || { riskScore: 0, band: "—", lastMonth: 0, breakdown: [] };
+  const legend = (s.breakdown || []).map((b) => ({ ...b, label: b.label || b.key, color: b.color || "var(--tx-dim)" }));
 
-  // Algorithm exposure still illustrative (no live algo index yet)
-  const algoMix = DATA.algoMix;
+  const { data: algoMix, source: algoSource } = useSplunkData("/api/algo-mix");
+  const { data: topAssets } = useSplunkData("/api/top-assets");
+  const { data: trends } = useSplunkData("/api/trends");
 
+  const noData = source !== "splunk" && !riskData?.riskScore;
   return (
     <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <HndlBanner onView={() => go("hndl")} />
+      {noData && (
+        <div className="card" style={{ padding: 18, display: "flex", alignItems: "center", gap: 14, background: "var(--warn-bg)", borderColor: "var(--warn-line)" }}>
+          <span style={{ color: "var(--warn)", display: "flex" }}><Icon name="alert" size={22} /></span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--tx-hi)" }}>No live data connected</div>
+            <div style={{ fontSize: 12.5, color: "var(--tx-mut)", marginTop: 2 }}>
+              Connect Splunk to see real network inventory, certificates and risk scores. <a href="/onboarding" style={{ color: "var(--brand-2)", textDecoration: "none" }}>Start setup →</a>
+            </div>
+          </div>
+        </div>
+      )}
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <SourceBadge source={source} />
+        {algoSource && <SourceBadge source={algoSource} />}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "300px 280px 1fr", gap: 16 }}>
         <Panel title="Quantum Risk Score" subtitle="Weighted by asset sensitivity & exposure" pad={10}>
@@ -87,24 +96,24 @@ export function Dashboard({ go }) {
           </div>
         </Panel>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "1fr 1fr", gap: 16 }}>
-          <StatTile label="Endpoints scanned" value={s.endpointsScanned ? s.endpointsScanned.toLocaleString() : DATA.summary.endpointsScanned.toLocaleString()} icon="globe" sub={<span><span style={{ color: "var(--safe)" }}>{s.coverage || DATA.summary.coverage}%</span> network coverage</span>} tone="brand" />
-          <StatTile label="Connections / 24h" value="1.31" unit="M" icon="zap" sub="passively observed via Zeek" tone="brand" />
-          <StatTile label="Certificates at risk" value="11" unit="/ 642" icon="cert" tone="high" sub={<span style={{ color: "var(--high)" }}>6 expiring &lt; 90 days</span>} />
-          <StatTile label="Critical exposures" value={legend.find((x) => x.key === "critical")?.value ?? 23} icon="alert" tone="crit" sub={<Delta value={-4} invert />} />
+          <StatTile label="Endpoints scanned" value={s.endpointsScanned ? s.endpointsScanned.toLocaleString() : "—"} icon="globe" sub={<span>{s.coverage != null ? <span style={{ color: "var(--safe)" }}>{s.coverage}%</span> : <span style={{ color: "var(--tx-dim)" }}>—</span>} network coverage</span>} tone="brand" />
+          <StatTile label="Connections / 24h" value={s.connectionsObserved ? (s.connectionsObserved / 1_000_000).toFixed(2) : "—"} unit="M" icon="zap" sub="passively observed via Zeek" tone="brand" />
+          <StatTile label="Certificates at risk" value={s.certsTracked ? String(s.certsTracked) : "—"} icon="cert" tone="high" sub={<span style={{ color: "var(--high)" }}>{s.certsTracked ? "Expiring soon" : "No data"}</span>} />
+          <StatTile label="Critical exposures" value={legend.find((x) => x.key === "critical")?.value ?? "—"} icon="alert" tone="crit" sub={<Delta value={-4} invert />} />
         </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1.55fr 1fr", gap: 16 }}>
         <Panel title="Quantum risk trend" subtitle="12-week score · lower is safer" right={<Tag tone="safe">▼ 20 pts since Q1</Tag>}>
-          <AreaChart data={DATA.riskTrend} color="var(--brand)" height={150} />
+          <AreaChart data={trends?.riskTrend || []} color="var(--brand)" height={150} />
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--tx-dim)", marginTop: 4, fontFamily: "var(--mono)" }}>
             <span>12 wks ago</span><span>9</span><span>6</span><span>3</span><span>now</span>
           </div>
         </Panel>
         <Panel title="Algorithm exposure" subtitle="Share of observed key exchanges">
-          <StackedBar data={algoMix} />
+          <StackedBar data={algoMix || []} />
           <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 16 }}>
-            {algoMix.map((a) => (
+            {(algoMix || []).map((a) => (
               <div key={a.algo} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 }}>
                 <span style={{ width: 8, height: 8, borderRadius: 2, background: TONE[riskTone[a.risk]].c }} />
                 <span className="mono" style={{ color: "var(--tx)", flex: 1, fontSize: 12 }}>{a.algo}</span>
@@ -126,7 +135,7 @@ export function Dashboard({ go }) {
             { k: "txns", label: "Traffic", align: "right", mono: true, mut: true },
             { k: "sensitivity", label: "Classification" },
           ]}
-          rows={DATA.topAssets}
+          rows={topAssets || []}
         />
       </Panel>
     </div>
@@ -137,11 +146,11 @@ export function Dashboard({ go }) {
 export function Inventory() {
   const [risk, setRisk] = useState("all");
   const [q, setQ] = useState("");
-  const { data: liveRows, source } = useSplunkData("/api/inventory", DATA.inventory);
-  const all = liveRows || DATA.inventory;
+  const { data: liveRows, source } = useSplunkData("/api/inventory");
+  const all = liveRows || [];
   const rows = all.filter((r) => (risk === "all" || r.risk === risk) && (q === "" || (r.server + r.cipher + r.dst + r.src).toLowerCase().includes(q.toLowerCase())));
   const counts = { all: all.length };
-  DATA.riskBreakdown.forEach((b) => (counts[b.key] = all.filter((r) => r.risk === b.key).length));
+  ["critical", "high", "monitor", "safe"].forEach((k) => (counts[k] = all.filter((r) => r.risk === k).length));
   const filters = [
     { k: "all", label: "All" }, { k: "critical", label: "Critical" }, { k: "high", label: "High" },
     { k: "monitor", label: "Monitor" }, { k: "safe", label: "Safe" },
@@ -202,8 +211,8 @@ const URGENCY = {
 };
 export function CertPlanner() {
   const [sort, setSort] = useState("expiry");
-  const { data: liveCerts, source } = useSplunkData("/api/certs", DATA.certs);
-  const certs = liveCerts && liveCerts.length ? liveCerts : DATA.certs;
+  const { data: liveCerts, source } = useSplunkData("/api/certs");
+  const certs = liveCerts || [];
   const rows = [...certs].sort((a, b) => (sort === "expiry" ? a.expiry - b.expiry : a.subject.localeCompare(b.subject)));
   const isPQC = (a) => a === "ML-DSA-65";
   const keyLabel = (c) => (isPQC(c.alg) ? "ML-DSA-65" : c.alg === "rsaEncryption" ? `RSA-${c.bits}` : `ECC P-${c.bits}`);
@@ -281,10 +290,23 @@ export function CertPlanner() {
 /* ---------------- HNDL detection ---------------- */
 export function HndlDetect() {
   const [sel, setSel] = useState(0);
-  const { data: anomalies, source } = useSplunkData("/api/hndl", DATA.hndlAnomalies);
-  const list = anomalies && anomalies.length ? anomalies : DATA.hndlAnomalies;
+  const { data: anomalies, source } = useSplunkData("/api/hndl");
+  const { data: timeline } = useSplunkData("/api/hndl/timeline");
+  const list = anomalies || [];
   const a = list[sel] || list[0];
   const statusTone = (s) => (s === "active" ? "crit" : "warn");
+  if (list.length === 0) return (
+    <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div className="card" style={{ padding: 40, textAlign: "center" }}>
+        <div style={{ color: "var(--safe)", display: "flex", justifyContent: "center", marginBottom: 10 }}><Icon name="shield" size={32} /></div>
+        <div style={{ fontSize: 15, fontWeight: 600, color: "var(--tx-hi)", marginBottom: 6 }}>No HNDL anomalies detected</div>
+        <div style={{ fontSize: 13.5, color: "var(--tx-mut)", maxWidth: 420, margin: "0 auto 16px", lineHeight: 1.5 }}>
+          Harvest-Now-Decrypt-Later detection requires encrypted egress data indexed in Splunk.
+        </div>
+        <a href="/onboarding" style={{ ...linkBtn, padding: "9px 15px", background: "var(--brand)", color: "#fff", borderColor: "var(--brand)", textDecoration: "none", display: "inline-flex" }}>Connect data sources</a>
+      </div>
+    </div>
+  );
   return (
     <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -295,7 +317,7 @@ export function HndlDetect() {
           <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 16, height: 3, background: "var(--cyan)", borderRadius: 2 }} />observed</span>
           <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 16, height: 10, background: "var(--crit)", opacity: .25, borderRadius: 2 }} />anomaly window</span>
         </div>}>
-        <AreaChart data={DATA.hndlTimeline} color="var(--cyan)" height={170} highlight={[34, 41]} />
+        <AreaChart data={timeline || []} color="var(--cyan)" height={170} highlight={[]} />
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--tx-dim)", marginTop: 4, fontFamily: "var(--mono)" }}>
           <span>-48h</span><span>-36h</span><span>-24h</span><span>-12h</span><span>now</span>
         </div>

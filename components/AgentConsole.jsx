@@ -43,6 +43,7 @@ export default function AgentConsole({ steps, onDone, title = "Crypto-Agility Ag
 
   useEffect(() => {
     if (!autorun) { doneCb.current && doneCb.current(); return; }
+    if (steps.length === 0) { setDone(true); doneCb.current && doneCb.current(); return; }
     run();
     return clearAll;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -50,7 +51,7 @@ export default function AgentConsole({ steps, onDone, title = "Crypto-Agility Ag
 
   useEffect(() => { if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight; }, [lines]);
 
-  const pct = Math.round((Math.min(stepIdx, steps.length) / steps.length) * 100);
+  const pct = steps.length ? Math.round((Math.min(stepIdx, steps.length) / steps.length) * 100) : 100;
 
   return (
     <div className="card" style={{ overflow: "hidden" }}>

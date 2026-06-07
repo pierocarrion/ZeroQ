@@ -57,6 +57,15 @@ export async function apiRisk() {
   return res.json();
 }
 
+export async function apiScanBatch(repos) {
+  const res = await fetch("/api/scan-batch", {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ repos }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Batch scan failed");
+  return data;
+}
+
 export async function apiGet(path) {
   const res = await fetch(path, { cache: "no-store" });
   return res.json();

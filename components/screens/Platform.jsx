@@ -1,16 +1,19 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { DATA } from "@/lib/data";
 import { TONE, Icon, Panel, Tag, GradeBadge, linkBtn } from "../primitives";
 import AgentConsole from "../AgentConsole";
-import { apiPlan, useScannedRepos } from "../client";
+import { apiPlan, useScannedRepos, useSplunkData } from "../client";
 
 /* ---------------- Org Security Plan (real /api/plan) ---------------- */
 export function OrgPlan({ go }) {
   const scanned = useScannedRepos();
   const [ready, setReady] = useState(false);
-  const [plan, setPlan] = useState(DATA.orgPlan);
+  const [plan, setPlan] = useState({ org: "—", generated: "—", summary: "", posture: "—", targetPosture: "A", weeks: 0, streams: [] });
   const [mode, setMode] = useState(null);
+  const { data: orgPlan } = useSplunkData("/api/org-plan");
+  const { data: rollup } = useSplunkData("/api/code-rollup");
+  const basePlan = orgPlan;
+  const r = rollup || {};
 
   const onAgentDone = async () => {
     try {
@@ -23,8 +26,8 @@ export function OrgPlan({ go }) {
 
   return (
     <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <AgentConsole steps={DATA.planRun} title="Generating org security plan"
-        subtitle={`${scanned[0]?.owner || "acme-corp"} · ${scanned.length ? scanned.length + " live-scanned repos" : "71 repos"} · MCP Server + hosted model`}
+      <AgentConsole steps={[]} title="Generating org security plan"
+        subtitle={`${scanned[0]?.owner || "org"} · ${scanned.length ? scanned.length + " live-scanned repos" : "no repos scanned yet"} · MCP Server + hosted model`}
         onDone={onAgentDone} />
 
       {!ready ? (
@@ -57,18 +60,18 @@ export function OrgPlan({ go }) {
             </div>
             <div className="card" style={{ padding: 16 }}>
               <div className="eyebrow">Auto-fixable now</div>
-              <div className="mono" style={{ fontSize: 26, fontWeight: 600, color: "var(--safe)", marginTop: 6 }}>28<span style={{ fontSize: 15, color: "var(--tx-mut)" }}> / 36</span></div>
+              <div className="mono" style={{ fontSize: 26, fontWeight: 600, color: "var(--safe)", marginTop: 6 }}>{r.fixablePR ?? 0}<span style={{ fontSize: 15, color: "var(--tx-mut)" }}> / {r.findings ?? 0}</span></div>
               <div style={{ fontSize: 12, color: "var(--tx-mut)" }}>via pull request</div>
             </div>
             <div className="card" style={{ padding: 16 }}>
               <div className="eyebrow">Cost framing</div>
-              <div className="mono" style={{ fontSize: 20, fontWeight: 600, color: "var(--tx-hi)", marginTop: 6 }}>~6 eng-weeks</div>
+              <div className="mono" style={{ fontSize: 20, fontWeight: 600, color: "var(--tx-hi)", marginTop: 6 }}>~{Math.ceil((basePlan?.weeks || 12) * 0.5)} eng-weeks</div>
               <div style={{ fontSize: 12, color: "var(--tx-mut)" }}>not millions in capital</div>
             </div>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {plan.streams.map((s, si) => {
+            {(plan.streams || []).map((s, si) => {
               const t = TONE[s.tone] || TONE.brand;
               return (
                 <div key={si} className="card" style={{ overflow: "hidden" }}>
@@ -106,8 +109,30 @@ export function OrgPlan({ go }) {
 }
 
 /* ---------------- Architecture ---------------- */
+const ARCH = {
+  layers: [
+    { title: "Sources", tone: "cyan", nodes: [
+      { name: "GitHub / GitLab org", sub: "REST + GraphQL · repo tree, blobs", icon: "globe" },
+      { name: "Network TAP / Zeek", sub: "ssl.log · x509.log (passive)", icon: "radar" },
+      { name: "PKI / CT logs", sub: "cert inventory feed", icon: "cert" },
+    ]},
+    { title: "Ingest & Index", tone: "brand", nodes: [
+      { name: "CAM Collector", sub: "Next API · async fetch → HEC", icon: "download" },
+      { name: "Splunk HEC", sub: "index=crypto_source / network_ssl", icon: "inventory" },
+    ]},
+    { title: "Splunk Intelligence", tone: "brand", nodes: [
+      { name: "SPL correlation searches", sub: "code ↔ runtime ↔ PKI joins", icon: "search" },
+      { name: "Splunk MCP Server", sub: "tool layer for the agent", icon: "zap" },
+      { name: "Splunk hosted model + AI Assistant", sub: "reasoning · NL queries · plan synthesis", icon: "ai" },
+    ]},
+    { title: "App & Actions", tone: "safe", nodes: [
+      { name: "CAM Dashboard (Next.js)", sub: "React · Splunk custom app", icon: "dashboard" },
+      { name: "Agent actions", sub: "open PRs · tickets · policy", icon: "roadmap" },
+    ]},
+  ],
+};
 export function Architecture() {
-  const a = DATA.arch;
+  const a = ARCH;
   return (
     <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div className="card" style={{ padding: 18, display: "flex", gap: 14, alignItems: "center" }}>
@@ -185,6 +210,150 @@ components/             # React UI`}
             </div>
           </div>
         </Panel>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Settings ---------------- */
+export function Settings() {
+  const [testing, setTesting] = useState({});
+  const [config, setConfig] = useState({
+    githubToken: "", splunkHecUrl: "", splunkHecToken: "", splunkBaseUrl: "", splunkUsername: "", splunkPassword: "", anthropicApiKey: "",
+  });
+
+  async function testGitHub() {
+    setTesting((t) => ({ ...t, github: true }));
+    try {
+      const res = await fetch("/api/onboarding/test-github", {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: config.githubToken }),
+      });
+      const data = await res.json();
+      setTesting((t) => ({ ...t, github: data.ok ? "ok" : "error", githubMsg: data.ok ? `Connected as ${data.login}` : data.error }));
+    } catch (e) {
+      setTesting((t) => ({ ...t, github: "error", githubMsg: e?.message }));
+    }
+  }
+
+  async function testSplunk() {
+    setTesting((t) => ({ ...t, splunk: true }));
+    try {
+      const res = await fetch("/api/onboarding/test-splunk", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ hecUrl: config.splunkHecUrl, hecToken: config.splunkHecToken, baseUrl: config.splunkBaseUrl, username: config.splunkUsername, password: config.splunkPassword }),
+      });
+      const data = await res.json();
+      setTesting((t) => ({ ...t, splunk: data.ok ? "ok" : "error", splunkMsg: data.ok ? "Connected" : (data.checks?.hec?.error || data.checks?.rest?.error || "Failed") }));
+    } catch (e) {
+      setTesting((t) => ({ ...t, splunk: "error", splunkMsg: e?.message }));
+    }
+  }
+
+  async function saveConfig() {
+    setTesting((t) => ({ ...t, saving: true }));
+    try {
+      const res = await fetch("/api/onboarding/config", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          githubToken: config.githubToken,
+          splunkHecUrl: config.splunkHecUrl,
+          splunkHecToken: config.splunkHecToken,
+          splunkBaseUrl: config.splunkBaseUrl,
+          splunkUsername: config.splunkUsername,
+          splunkPassword: config.splunkPassword,
+          anthropicApiKey: config.anthropicApiKey,
+        }),
+      });
+      const data = await res.json();
+      setTesting((t) => ({ ...t, saving: false, saved: data.ok, savedMsg: data.message || data.error }));
+    } catch (e) {
+      setTesting((t) => ({ ...t, saving: false, saved: false, savedMsg: e?.message }));
+    }
+  }
+
+  const inputStyle = {
+    padding: "0 14px", height: 40, background: "var(--bg-inset)", border: "1px solid var(--line)",
+    borderRadius: 10, color: "var(--tx)", fontFamily: "var(--font)", fontSize: 13, outline: "none", width: "100%",
+  };
+
+  return (
+    <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 800 }}>
+      <div className="card" style={{ padding: 22 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
+          <span style={{ color: "var(--brand-2)" }}><Icon name="lock" size={20} /></span>
+          <span style={{ fontWeight: 600, color: "var(--tx-hi)", fontSize: 15 }}>Data Sources</span>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          {/* GitHub */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--tx-hi)" }}>GitHub</span>
+              {testing.github === "ok" && <Tag tone="safe">Connected</Tag>}
+              {testing.github === "error" && <Tag tone="crit">{testing.githubMsg}</Tag>}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10 }}>
+              <input type="password" value={config.githubToken} onChange={(e) => setConfig((c) => ({ ...c, githubToken: e.target.value }))} placeholder="ghp_xxxxxxxxxxxx" style={inputStyle} />
+              <button onClick={testGitHub} disabled={testing.github === true} style={{ ...linkBtn, padding: "0 14px", height: 40 }}>{testing.github === true ? <Spinner size={14} /> : "Test"}</button>
+            </div>
+          </div>
+
+          {/* Splunk HEC */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--tx-hi)" }}>Splunk HEC</span>
+              {testing.splunk === "ok" && <Tag tone="safe">Connected</Tag>}
+              {testing.splunk === "error" && <Tag tone="crit">{testing.splunkMsg}</Tag>}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <input value={config.splunkHecUrl} onChange={(e) => setConfig((c) => ({ ...c, splunkHecUrl: e.target.value }))} placeholder="HEC URL" style={inputStyle} />
+              <input type="password" value={config.splunkHecToken} onChange={(e) => setConfig((c) => ({ ...c, splunkHecToken: e.target.value }))} placeholder="HEC Token" style={inputStyle} />
+            </div>
+          </div>
+
+          {/* Splunk REST */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--tx-hi)" }}>Splunk REST API</span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+              <input value={config.splunkBaseUrl} onChange={(e) => setConfig((c) => ({ ...c, splunkBaseUrl: e.target.value }))} placeholder="Base URL" style={inputStyle} />
+              <input value={config.splunkUsername} onChange={(e) => setConfig((c) => ({ ...c, splunkUsername: e.target.value }))} placeholder="Username" style={inputStyle} />
+              <input type="password" value={config.splunkPassword} onChange={(e) => setConfig((c) => ({ ...c, splunkPassword: e.target.value }))} placeholder="Password" style={inputStyle} />
+            </div>
+            <button onClick={testSplunk} disabled={testing.splunk === true} style={{ ...linkBtn, padding: "8px 14px", alignSelf: "flex-start" }}>{testing.splunk === true ? <Spinner size={14} /> : "Test Splunk connections"}</button>
+          </div>
+
+          {/* AI */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--tx-hi)" }}>AI Provider</span>
+            <input type="password" value={config.anthropicApiKey} onChange={(e) => setConfig((c) => ({ ...c, anthropicApiKey: e.target.value }))} placeholder="Anthropic API Key (optional)" style={inputStyle} />
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4 }}>
+            <button onClick={saveConfig} disabled={testing.saving} style={{ ...linkBtn, padding: "10px 18px", background: "var(--brand)", color: "#fff", borderColor: "var(--brand)", fontWeight: 600 }}>
+              {testing.saving ? <Spinner size={14} /> : "Save configuration"}
+            </button>
+            {testing.saved === true && <Tag tone="safe">{testing.savedMsg}</Tag>}
+            {testing.saved === false && <Tag tone="crit">{testing.savedMsg}</Tag>}
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ padding: 18 }}>
+        <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--tx-hi)", marginBottom: 10 }}>Ingestion guides</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {[
+            { label: "Network (Zeek) → crypto_net", desc: "Forward ssl.log and x509.log to Splunk HEC with sourcetype cam:tls_connection." },
+            { label: "Certificates → crypto_pki", desc: "Export X.509 metadata (subject, alg, bits, expiry) to Splunk HEC with sourcetype cam:cert." },
+            { label: "HNDL → crypto_hndl", desc: "Send anomaly events (dst, volume, deviation) to Splunk HEC with sourcetype cam:hndl_event." },
+          ].map((g) => (
+            <div key={g.label} style={{ display: "flex", flexDirection: "column", gap: 2, padding: "10px 12px", background: "var(--bg-inset)", borderRadius: 9, border: "1px solid var(--line)" }}>
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--tx-hi)" }}>{g.label}</span>
+              <span style={{ fontSize: 12, color: "var(--tx-mut)" }}>{g.desc}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -1,12 +1,12 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { DATA } from "@/lib/data";
 import { TONE, Icon, Logo, Tag, iconBtn } from "./primitives";
+import { useSplunkData } from "./client";
 import { Dashboard, Inventory, CertPlanner, HndlDetect } from "./screens/Monitor";
 import { Repos, Agent } from "./screens/Source";
 import { Assistant, Roadmap, Compliance } from "./screens/Intel";
-import { OrgPlan, Architecture } from "./screens/Platform";
+import { OrgPlan, Architecture, Settings } from "./screens/Platform";
 import { apiRisk } from "./client";
 
 const NAV = [
@@ -29,6 +29,7 @@ const NAV = [
     { id: "compliance", label: "Compliance", icon: "shield" },
   ]},
   { group: "Platform", items: [
+    { id: "settings", label: "Settings", icon: "lock" },
     { id: "architecture", label: "Architecture", icon: "roadmap" },
   ]},
 ];
@@ -44,6 +45,7 @@ const TITLES = {
   assistant: ["AI Assistant", "Natural-language queries over your crypto posture"],
   roadmap: ["AI Migration Roadmap", "Prioritized, plain-English path to quantum-safe"],
   compliance: ["Compliance Mapping", "Findings mapped to NIST, NSA & CISA deadlines"],
+  settings: ["Settings", "Manage connections to GitHub, Splunk and AI"],
   architecture: ["Architecture", "How the app runs on Splunk — install, configure, done"],
 };
 
@@ -59,6 +61,7 @@ function Screen({ id, go }) {
     case "assistant": return <Assistant />;
     case "roadmap": return <Roadmap />;
     case "compliance": return <Compliance />;
+    case "settings": return <Settings />;
     case "architecture": return <Architecture />;
     default: return <Dashboard go={go} />;
   }
@@ -94,6 +97,16 @@ function Sidebar({ active, go, splunkLive }) {
         ))}
       </nav>
       <div style={{ padding: 14, borderTop: "1px solid var(--line)", display: "flex", flexDirection: "column", gap: 10 }}>
+        {!splunkLive && (
+          <Link href="/onboarding" style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", background: "var(--warn-bg)", border: "1px solid var(--warn-line)", borderRadius: 10, textDecoration: "none" }}>
+            <span style={{ width: 8, height: 8, borderRadius: 999, background: "var(--warn)", flexShrink: 0 }} />
+            <div style={{ lineHeight: 1.3 }}>
+              <div style={{ fontSize: 12, color: "var(--tx)", fontWeight: 500 }}>Setup required</div>
+              <div style={{ fontSize: 11, color: "var(--tx-mut)" }}>Connect Splunk & GitHub</div>
+            </div>
+            <span style={{ marginLeft: "auto", color: "var(--warn)" }}><Icon name="chevron" size={12} /></span>
+          </Link>
+        )}
         <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "10px 12px", background: "var(--bg-inset)", border: "1px solid var(--line)", borderRadius: 10 }}>
           <span style={{ width: 8, height: 8, borderRadius: 999, background: splunkLive ? "var(--safe)" : "var(--warn)", animation: splunkLive ? "pulse-dot 1.8s infinite" : "none", flexShrink: 0 }} />
           <div style={{ lineHeight: 1.3 }}>
@@ -112,8 +125,10 @@ function Sidebar({ active, go, splunkLive }) {
 
 function Topbar({ active, splunkLive }) {
   const [title, sub] = TITLES[active];
-  const s = DATA.summary;
-  const band = s.riskScore >= 60 ? "high" : s.riskScore >= 35 ? "warn" : "safe";
+  const { data: riskData } = useSplunkData("/api/risk");
+  const riskScore = riskData?.riskScore ?? 0;
+  const riskBand = riskData?.riskBand ?? "—";
+  const band = riskScore >= 60 ? "high" : riskScore >= 35 ? "warn" : "safe";
   const t = TONE[band];
   return (
     <header style={{ display: "flex", alignItems: "center", gap: 16, padding: "15px 26px", borderBottom: "1px solid var(--line)", background: "var(--bg-0)", position: "sticky", top: 0, zIndex: 10 }}>
@@ -133,7 +148,7 @@ function Topbar({ active, splunkLive }) {
         </div>
         <div style={{ lineHeight: 1.15 }}>
           <div style={{ fontSize: 10, color: "var(--tx-dim)", letterSpacing: ".08em" }}>RISK SCORE</div>
-          <div className="mono" style={{ fontSize: 14, fontWeight: 600, color: t.c }}>{s.riskScore} · {s.riskBand}</div>
+          <div className="mono" style={{ fontSize: 14, fontWeight: 600, color: t.c }}>{riskScore || "—"} · {riskBand}</div>
         </div>
       </div>
       <button style={iconBtn}><Icon name="bell" size={17} /><span style={{ position: "absolute", top: 8, right: 9, width: 6, height: 6, borderRadius: 999, background: "var(--crit)" }} /></button>
