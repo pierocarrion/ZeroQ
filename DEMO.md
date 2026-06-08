@@ -1,4 +1,4 @@
-# Demo Runbook — Crypto-Agility Monitor on Splunk Trial
+# Demo Runbook — ZeroQ on Splunk Trial
 
 Este documento describe el flujo completo para probar el sistema al 100% usando **Splunk Cloud Trial** (o Splunk Enterprise local).
 
@@ -9,7 +9,7 @@ Este documento describe el flujo completo para probar el sistema al 100% usando 
 - Node.js ≥18.17
 - Cuenta Splunk Cloud Trial activa (14 días, 5 GB/día)
 - GitHub/GitLab token (opcional, mejora rate limits)
-- Anthropic API key (opcional, activa modo "live" en AI Assistant)
+- DeepSeek API key (opcional, activa modo "live" en AI Assistant)
 
 ---
 
@@ -22,8 +22,8 @@ Este documento describe el flujo completo para probar el sistema al 100% usando 
 
 ### 2.2 Habilitar HEC
 1. Splunk Web → **Settings → Data Inputs → HTTP Event Collector → New Token**.
-2. **Name:** `cam-hec`
-3. **Source type:** `cam:scanner`
+2. **Name:** `zeroq-hec`
+3. **Source type:** `zeroq:scanner`
 4. **Allowed indexes:** `crypto_source`, `crypto_net`, `crypto_pki`, `crypto_hndl`, `crypto_plan`
 5. **Default index:** `crypto_source`
 6. Guardar el token (ej. `abcd1234-...`).
@@ -38,7 +38,7 @@ Settings → Indexes → New Index. Crear uno por cada índice:
 
 ### 2.4 Crear usuario de búsqueda
 1. Settings → Users → New User
-2. **Username:** `cam_api`
+2. **Username:** `zeroq_api`
 3. **Password:** segura
 4. **Role:** `power` (o `user` con permisos a los 5 índices)
 
@@ -62,7 +62,7 @@ SPLUNK_INDEX_SOURCE=crypto_source
 
 # REST API
 SPLUNK_BASE_URL=https://mytenant.splunkcloud.com
-SPLUNK_USERNAME=cam_api
+SPLUNK_USERNAME=zeroq_api
 SPLUNK_PASSWORD=tu-password
 SPLUNK_INDEX_NET=crypto_net
 SPLUNK_INDEX_PKI=crypto_pki
@@ -70,7 +70,7 @@ SPLUNK_INDEX_HNDL=crypto_hndl
 SPLUNK_INDEX_PLAN=crypto_plan
 
 # Opcional
-ANTHROPIC_API_KEY=sk-ant-...
+DEEPSEEK_API_KEY=sk-...
 GITHUB_TOKEN=ghp_...
 ```
 
@@ -170,7 +170,7 @@ Preguntar:
 - "¿Cuántos certificados expiran en 30 días?"
 - "¿Qué servicios usan TLS 1.0/1.1?"
 
-Si hay `ANTHROPIC_API_KEY`, responde con datos reales de Splunk.  
+Si hay `DEEPSEEK_API_KEY`, responde con datos reales de Splunk.  
 Si no, usa el fallback local con seed data (indicador amarillo "local reasoner").
 
 ### Paso 6 — Generar plan de migración (30 segundos)
@@ -182,22 +182,22 @@ Esperar plan estructurado con streams, repos y acciones priorizadas.
 
 ### Paso 7 — Instalar Splunk App nativa (2 minutos)
 
-1. Comprimir `cam-splunk-app/` en un `.tar.gz` o `.spl`:
+1. Comprimir `zeroq-splunk-app/` en un `.tar.gz` o `.spl`:
    ```bash
-   cd cam-splunk-app
-   tar -czvf ../cam-splunk-app.spl .
+   cd zeroq-splunk-app
+   tar -czvf ../zeroq-splunk-app.spl .
    ```
 2. En Splunk Web → **Apps → Manage Apps → Install app from file**.
-3. Subir `cam-splunk-app.spl`.
+3. Subir `zeroq-splunk-app.spl`.
 4. Reiniciar Splunk si se solicita.
-5. Navegar a **Apps → Crypto-Agility Monitor**.
+5. Navegar a **Apps → ZeroQ**.
 6. Abrir cada uno de los 5 dashboards y confirmar que renderizan datos.
 
 ### Paso 8 — Probar alertas (1 minuto)
 
 1. Forzar un hallazgo crítico escaneando un repo vulnerable.
 2. Ir a **Settings → Searches, reports, and alerts**.
-3. Buscar **CAM Critical Findings Daily**.
+3. Buscar **ZeroQ Critical Findings Daily**.
 4. Click **Run**.
 5. Verificar que genera resultados con `count > 0`.
 
@@ -228,7 +228,7 @@ Esperar plan estructurado con streams, repos y acciones priorizadas.
 | `seed:splunk` falla con 403 | Token HEC no tiene acceso al índice | En Splunk, editar token HEC → allowed indexes. |
 | Dashboards frontend vacíos | Splunk Search API devuelve 0 resultados | Confirmar que `seed:splunk` se ejecutó. Revisar earliest time en queries. |
 | Latencia alta en UI | Splunk Cloud tarda en responder | Normal la primera vez; los resultados se cachean 30s. |
-| AI Assistant en "fallback" | Falta `ANTHROPIC_API_KEY` | Agregar key o usar preguntas soportadas por el local reasoner. |
+| AI Assistant en "fallback" | Falta `DEEPSEEK_API_KEY` | Agregar key o usar preguntas soportadas por el local reasoner. |
 | CORS en HEC desde frontend | HEC no permite CORS | Las escrituras siempre son server-side vía `/api/scan`. No se usa HEC directamente desde el browser. |
 
 ---

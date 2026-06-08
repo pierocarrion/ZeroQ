@@ -4,15 +4,22 @@ import { GitHubProvider } from "@/lib/providers/GitHubProvider";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// GET /api/github/orgs?token=ghp_xxx
+// GET /api/github/orgs?org=facebook
+// Validates that an org exists (no token required for public orgs)
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const token = searchParams.get("token") || undefined;
+  const org = searchParams.get("org");
+  if (!org) {
+    return NextResponse.json({ data: null, error: "Missing org parameter" }, { status: 400 });
+  }
   try {
     const provider = new GitHubProvider();
-    const orgs = await provider.listOrgs(token || undefined);
-    return NextResponse.json({ data: orgs, source: "github" });
+    const info = await provider.validateOrg(org);
+    if (!info) {
+      return NextResponse.json({ data: null, error: "Organization not found" }, { status: 404 });
+    }
+    return NextResponse.json({ data: [info], source: "github" });
   } catch (e: any) {
-    return NextResponse.json({ data: null, error: e?.message || "Failed to list orgs" }, { status: 400 });
+    return NextResponse.json({ data: null, error: e?.message || "Failed to validate org" }, { status: 400 });
   }
 }

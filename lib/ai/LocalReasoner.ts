@@ -23,6 +23,6 @@ export class LocalReasoner implements AIProvider {
       return "Connect Splunk to see live quantum risk scores and trends.";
     if (q.includes("cert") || q.includes("expire"))
       return "Track certificates expiring within 90 days and renew them with PQC-capable algorithms (ML-DSA-65) rather than RSA to avoid double migration.";
-    return "Set ANTHROPIC_API_KEY for free-form AI answers, or open the Repository Scanner to live-scan a public repo.";
+    return "Set DEEPSEEK_API_KEY for free-form AI answers, or open the Repository Scanner to live-scan a public repo.";
   }
 }

@@ -10,7 +10,7 @@ export class GitLabProvider implements SourceProvider {
   readonly kind = "gitlab" as const;
 
   private headers(): Record<string, string> {
-    const h: Record<string, string> = { "User-Agent": "crypto-agility-monitor" };
+    const h: Record<string, string> = { "User-Agent": "zeroq" };
     if (config.gitlab.token) h["PRIVATE-TOKEN"] = config.gitlab.token;
     return h;
   }

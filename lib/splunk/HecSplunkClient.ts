@@ -6,6 +6,7 @@ import { config } from "../config";
 import type { AlgoMixItem, CodeRollup, IngestResult, Org, OrgPlan, RepoSeed, RoadmapPhase, ScanResult, TopAsset } from "../types";
 import type { SplunkClient, RiskSummary, TlsConnection, Certificate, HndlAnomaly, ComplianceStat, RiskTier } from "./SplunkClient";
 import { SplunkSearchClient } from "./SplunkSearchClient";
+import { splunkFetch } from "./fetchSplunk";
 
 export class HecSplunkClient implements SplunkClient {
   readonly enabled = true;
@@ -25,14 +26,14 @@ export class HecSplunkClient implements SplunkClient {
     const events = result.detail.map((f) => ({
       time: now,
       host: result.provider,
-      source: "cam:scanner",
-      sourcetype: "cam:crypto_finding",
+      source: "zeroq:scanner",
+      sourcetype: "zeroq:crypto_finding",
       index: config.splunk.indexSource,
       event: { repo: result.repo, provider: result.provider, grade: result.grade, ...f },
     }));
     const body = events.map((e) => JSON.stringify(e)).join("\n");
     try {
-      const res = await fetch(`${config.splunk.hecUrl}/services/collector/event`, {
+      const res = await splunkFetch(`${config.splunk.hecUrl}/services/collector/event`, {
         method: "POST",
         headers: { Authorization: `Splunk ${config.splunk.hecToken}` },
         body,
@@ -47,10 +48,10 @@ export class HecSplunkClient implements SplunkClient {
     if (!this.search.enabled) return null;
     const src = config.splunk.indexSource;
     const [findingsRes, netRes, pkiRes, metaRes] = await Promise.all([
-      this.search.query(`| index=${src} sourcetype=cam:crypto_finding earliest=-30d | stats count by sev`, { earliest: "-30d" }),
-      this.search.query(`| index=${config.splunk.indexes.net} sourcetype=cam:tls_connection earliest=-7d | stats count by risk`, { earliest: "-7d" }),
-      this.search.query(`| index=${config.splunk.indexes.pki} sourcetype=cam:cert | stats count by urgency`, { earliest: "-1y" }),
-      this.search.query(`| index=${config.splunk.indexes.net} sourcetype=cam:tls_connection earliest=-7d | stats dc(server) as endpointsScanned, dc(version) as versions, count as connectionsObserved`, { earliest: "-7d" }),
+      this.search.query(`| index=${src} sourcetype=zeroq:crypto_finding earliest=-30d | stats count by sev`, { earliest: "-30d" }),
+      this.search.query(`| index=${config.splunk.indexes.net} sourcetype=zeroq:tls_connection earliest=-7d | stats count by risk`, { earliest: "-7d" }),
+      this.search.query(`| index=${config.splunk.indexes.pki} sourcetype=zeroq:cert | stats count by urgency`, { earliest: "-1y" }),
+      this.search.query(`| index=${config.splunk.indexes.net} sourcetype=zeroq:tls_connection earliest=-7d | stats dc(server) as endpointsScanned, dc(version) as versions, count as connectionsObserved`, { earliest: "-7d" }),
     ]);
 
     const bySev: Record<string, number> = {};
@@ -93,12 +94,12 @@ export class HecSplunkClient implements SplunkClient {
   async getInventory(filters?: { risk?: string; version?: string; cipher?: string }): Promise<TlsConnection[] | null> {
     if (!this.search.enabled) return null;
     const idx = config.splunk.indexes.net;
-    let spl = `| index=${idx} sourcetype=cam:tls_connection earliest=-7d | sort - _time | head 200`;
+    let spl = `| index=${idx} sourcetype=zeroq:tls_connection earliest=-7d | sort - _time | head 200`;
     const wheres: string[] = [];
     if (filters?.risk) wheres.push(`risk="${filters.risk}"`);
     if (filters?.version) wheres.push(`version="${filters.version}"`);
     if (filters?.cipher) wheres.push(`cipher="${filters.cipher}"`);
-    if (wheres.length) spl = `| index=${idx} sourcetype=cam:tls_connection earliest=-7d | search ${wheres.join(" AND ")} | sort - _time | head 200`;
+    if (wheres.length) spl = `| index=${idx} sourcetype=zeroq:tls_connection earliest=-7d | search ${wheres.join(" AND ")} | sort - _time | head 200`;
     const res = await this.search.query(spl, { earliest: "-7d", maxCount: 200 });
     return res.results.map((r) => ({
       server: String(r.server || ""),
@@ -117,7 +118,7 @@ export class HecSplunkClient implements SplunkClient {
   async getCertificates(): Promise<Certificate[] | null> {
     if (!this.search.enabled) return null;
     const idx = config.splunk.indexes.pki;
-    const spl = `| index=${idx} sourcetype=cam:cert | eval days_left=round((expiry_epoch - now())/86400,0) | sort days_left | head 200`;
+    const spl = `| index=${idx} sourcetype=zeroq:cert | eval days_left=round((expiry_epoch - now())/86400,0) | sort days_left | head 200`;
     const res = await this.search.query(spl, { earliest: "-1y", maxCount: 200 });
     return res.results.map((r) => ({
       subject: String(r.subject || ""),
@@ -133,7 +134,7 @@ export class HecSplunkClient implements SplunkClient {
   async getHndlAnomalies(): Promise<HndlAnomaly[] | null> {
     if (!this.search.enabled) return null;
     const idx = config.splunk.indexes.hndl;
-    const spl = `| index=${idx} sourcetype=cam:hndl_event | sort - deviation | head 50`;
+    const spl = `| index=${idx} sourcetype=zeroq:hndl_event | sort - deviation | head 50`;
     const res = await this.search.query(spl, { earliest: "-7d", maxCount: 50 });
     return res.results.map((r) => ({
       dst: String(r.dst || ""),
@@ -153,7 +154,7 @@ export class HecSplunkClient implements SplunkClient {
   async getComplianceStats(): Promise<ComplianceStat[] | null> {
     if (!this.search.enabled) return null;
     const idx = config.splunk.indexSource;
-    const spl = `| index=${idx} sourcetype=cam:crypto_finding earliest=-90d | lookup cam_compliance_mapping rule OUTPUT framework, authority, desc | stats count by framework, authority, desc | eval progress=0, mapped=count, atRisk=count`;
+    const spl = `| index=${idx} sourcetype=zeroq:crypto_finding earliest=-90d | lookup zeroq_compliance_mapping rule OUTPUT framework, authority, desc | stats count by framework, authority, desc | eval progress=0, mapped=count, atRisk=count`;
     const res = await this.search.query(spl, { earliest: "-90d", maxCount: 50 });
     if (res.results.length === 0) return null;
     return res.results.map((r) => ({
@@ -169,7 +170,7 @@ export class HecSplunkClient implements SplunkClient {
   async getAlgoMix(): Promise<AlgoMixItem[] | null> {
     if (!this.search.enabled) return null;
     const idx = config.splunk.indexes.net;
-    const spl = `| index=${idx} sourcetype=cam:tls_connection earliest=-7d | stats count by kex_algo | eventstats sum(count) as total | eval pct=round(count*100/total,1), risk=case(match(kex_algo,"RSA"),"critical",match(kex_algo,"Legacy TLS"),"high",match(kex_algo,"secp384r1"),"high",match(kex_algo,"secp256r1"),"high",match(kex_algo,"TLS 1.3\\s*\\+\\s*ML-KEM"),"safe",true(),"monitor") | sort - pct`;
+    const spl = `| index=${idx} sourcetype=zeroq:tls_connection earliest=-7d | stats count by kex_algo | eventstats sum(count) as total | eval pct=round(count*100/total,1), risk=case(match(kex_algo,"RSA"),"critical",match(kex_algo,"Legacy TLS"),"high",match(kex_algo,"secp384r1"),"high",match(kex_algo,"secp256r1"),"high",match(kex_algo,"TLS 1.3\\s*\\+\\s*ML-KEM"),"safe",true(),"monitor") | sort - pct`;
     const res = await this.search.query(spl, { earliest: "-7d", maxCount: 20 });
     if (res.results.length === 0) return null;
     return res.results.map((r) => ({
@@ -182,7 +183,7 @@ export class HecSplunkClient implements SplunkClient {
   async getTopAssets(): Promise<TopAsset[] | null> {
     if (!this.search.enabled) return null;
     const idx = config.splunk.indexes.net;
-    const spl = `| index=${idx} sourcetype=cam:tls_connection earliest=-7d | stats latest(risk) as risk, latest(version) as version, latest(cipher) as cipher, latest(curve) as curve, max(hosts) as hosts, max(txns_day) as txns_day, latest(sensitivity) as sensitivity by server | eval algo=case(match(cipher,"RSA"),"RSA key exchange",match(version,"TLS 1.0|TLS 1.1"),"Legacy TLS 1.0/1.1",match(curve,"MLKEM|X25519MLKEM"),"TLS 1.3 + ML-KEM",match(curve,"secp256r1"),"ECDHE · secp256r1",match(curve,"secp384r1"),"ECDHE · secp384r1",true(),"TLS 1.2 · ECDHE"), txns=if(isnull(txns_day),"—",txns_day." /day"), risk=case(risk=="","monitor",true(),risk) | sort risk | head 10`;
+    const spl = `| index=${idx} sourcetype=zeroq:tls_connection earliest=-7d | stats latest(risk) as risk, latest(version) as version, latest(cipher) as cipher, latest(curve) as curve, max(hosts) as hosts, max(txns_day) as txns_day, latest(sensitivity) as sensitivity by server | eval algo=case(match(cipher,"RSA"),"RSA key exchange",match(version,"TLS 1.0|TLS 1.1"),"Legacy TLS 1.0/1.1",match(curve,"MLKEM|X25519MLKEM"),"TLS 1.3 + ML-KEM",match(curve,"secp256r1"),"ECDHE · secp256r1",match(curve,"secp384r1"),"ECDHE · secp384r1",true(),"TLS 1.2 · ECDHE"), txns=if(isnull(txns_day),"—",txns_day." /day"), risk=case(risk=="","monitor",true(),risk) | sort risk | head 10`;
     const res = await this.search.query(spl, { earliest: "-7d", maxCount: 10 });
     if (res.results.length === 0) return null;
     return res.results.map((r) => ({
@@ -199,7 +200,7 @@ export class HecSplunkClient implements SplunkClient {
     if (!this.search.enabled) return null;
     const src = config.splunk.indexSource;
     const net = config.splunk.indexes.net;
-    const spl = `| index=${src} sourcetype=cam:crypto_finding earliest=-90d OR index=${net} sourcetype=cam:tls_connection earliest=-90d | bucket _time span=1w | eval points=case(sourcetype=="cam:crypto_finding" AND sev=="critical",100,sev=="high",66,sev=="monitor",33,sourcetype=="cam:tls_connection" AND risk=="critical",100,risk=="high",66,risk=="monitor",33,true(),0) | stats avg(points) as score by _time | sort _time | eval score=round(score,0)`;
+    const spl = `| index=${src} sourcetype=zeroq:crypto_finding earliest=-90d OR index=${net} sourcetype=zeroq:tls_connection earliest=-90d | bucket _time span=1w | eval points=case(sourcetype=="zeroq:crypto_finding" AND sev=="critical",100,sev=="high",66,sev=="monitor",33,sourcetype=="zeroq:tls_connection" AND risk=="critical",100,risk=="high",66,risk=="monitor",33,true(),0) | stats avg(points) as score by _time | sort _time | eval score=round(score,0)`;
     const res = await this.search.query(spl, { earliest: "-90d", maxCount: 12 });
     if (res.results.length === 0) return null;
     return res.results.map((r) => Number(r.score || 0));
@@ -208,7 +209,7 @@ export class HecSplunkClient implements SplunkClient {
   async getHndlTimeline(): Promise<number[] | null> {
     if (!this.search.enabled) return null;
     const idx = config.splunk.indexes.hndl;
-    const spl = `| index=${idx} sourcetype=cam:hndl_event earliest=-48h | bucket _time span=1h | stats sum(volume_gb) as v by _time | sort _time | eval v=round(v,1)`;
+    const spl = `| index=${idx} sourcetype=zeroq:hndl_event earliest=-48h | bucket _time span=1h | stats sum(volume_gb) as v by _time | sort _time | eval v=round(v,1)`;
     const res = await this.search.query(spl, { earliest: "-48h", maxCount: 48 });
     if (res.results.length === 0) return null;
     return res.results.map((r) => Number(r.v || 0));
@@ -217,7 +218,7 @@ export class HecSplunkClient implements SplunkClient {
   async getRoadmap(): Promise<RoadmapPhase[] | null> {
     if (!this.search.enabled) return null;
     const idx = config.splunk.indexes.plan;
-    const spl = `| index=${idx} sourcetype=cam:roadmap | sort phase, item_order`;
+    const spl = `| index=${idx} sourcetype=zeroq:roadmap | sort phase, item_order`;
     const res = await this.search.query(spl, { earliest: "-1y", maxCount: 200 });
     if (res.results.length === 0) return null;
     const phases = new Map<string, RoadmapPhase>();
@@ -245,7 +246,7 @@ export class HecSplunkClient implements SplunkClient {
   async getOrgs(): Promise<Org[] | null> {
     if (!this.search.enabled) return null;
     const src = config.splunk.indexSource;
-    const spl = `| index=${src} sourcetype=cam:repo_meta earliest=-30d | stats latest(name) as name, latest(provider) as provider, dc(repo) as repos, max(stars) as stars, max(members) as members, max(scanned_epoch) as scanned_epoch by org | eval lastScan=case(now()-scanned_epoch<3600,"4m",now()-scanned_epoch<7200,"1h",true(),round((now()-scanned_epoch)/3600)."h"), status="connected"`;
+    const spl = `| index=${src} sourcetype=zeroq:repo_meta earliest=-30d | stats latest(name) as name, latest(provider) as provider, dc(repo) as repos, max(stars) as stars, max(members) as members, max(scanned_epoch) as scanned_epoch by org | eval lastScan=case(now()-scanned_epoch<3600,"4m",now()-scanned_epoch<7200,"1h",true(),round((now()-scanned_epoch)/3600)."h"), status="connected"`;
     const res = await this.search.query(spl, { earliest: "-30d", maxCount: 50 });
     if (res.results.length === 0) return null;
     return res.results.map((r) => ({
@@ -264,7 +265,7 @@ export class HecSplunkClient implements SplunkClient {
   async getRepos(): Promise<RepoSeed[] | null> {
     if (!this.search.enabled) return null;
     const src = config.splunk.indexSource;
-    const spl = `| index=${src} sourcetype=cam:crypto_finding earliest=-30d | stats count as findings, sum(eval(if(sev=="critical",1,0))) as critical, sum(eval(if(sev=="high",1,0))) as high, sum(eval(if(sev=="monitor",1,0))) as monitor, values(file) as files, values(kind) as kinds, values(line) as lines, values(code) as codes, values(fix) as fixes, values(sev) as sevs by repo, provider, lang, branch, owner | eval grade=case(critical>2 OR (critical>0 AND (critical*5+high*2+(findings-critical-high))>12),"F",critical>0 AND (critical*5+high*2+(findings-critical-high))<=12,"D",critical==0 AND (high*2+(findings-high))>2,"C",critical==0 AND findings>0,"B",true(),"A"), loc="—"`;
+    const spl = `| index=${src} sourcetype=zeroq:crypto_finding earliest=-30d | stats count as findings, sum(eval(if(sev=="critical",1,0))) as critical, sum(eval(if(sev=="high",1,0))) as high, sum(eval(if(sev=="monitor",1,0))) as monitor, values(file) as files, values(kind) as kinds, values(line) as lines, values(code) as codes, values(fix) as fixes, values(sev) as sevs by repo, provider, lang, branch, owner | eval grade=case(critical>2 OR (critical>0 AND (critical*5+high*2+(findings-critical-high))>12),"F",critical>0 AND (critical*5+high*2+(findings-critical-high))<=12,"D",critical==0 AND (high*2+(findings-high))>2,"C",critical==0 AND findings>0,"B",true(),"A"), loc="—"`;
     const res = await this.search.query(spl, { earliest: "-30d", maxCount: 200 });
     if (res.results.length === 0) return null;
     return res.results.map((r) => {
@@ -305,9 +306,9 @@ export class HecSplunkClient implements SplunkClient {
     if (!this.search.enabled) return null;
     const src = config.splunk.indexSource;
     const [rollupRes, langRes, patternRes] = await Promise.all([
-      this.search.query(`| index=${src} sourcetype=cam:crypto_finding earliest=-30d | stats dc(repo) as reposScanned, count as findings, sum(eval(if(sev=="critical",1,0))) as critical, sum(eval(if(sev=="high",1,0))) as high, sum(eval(if(sev=="monitor",1,0))) as monitor, sum(eval(if(match(kind,"RSA key generation|Static.*cipher|legacy cipher") OR match(fix,"Bump|Upgrade"),1,0))) as fixablePR`, { earliest: "-30d" }),
-      this.search.query(`| index=${src} sourcetype=cam:crypto_finding earliest=-30d | stats count as findings by lang | eval color=case(lang=="Java","var(--high)",lang=="Go","var(--cyan)",lang=="Python","var(--brand)",lang=="C#","var(--crit)",lang=="TypeScript","var(--safe)",true(),"var(--warn)") | sort -findings`, { earliest: "-30d", maxCount: 20 }),
-      this.search.query(`| index=${src} sourcetype=cam:crypto_finding earliest=-30d | eval pattern=case(match(kind,"RSA key generation|RSA-OAEP|RSA-PKCS1"),"RSA key generation / encryption",match(kind,"Static.*cipher|legacy cipher|TLS_RSA"),"Static / legacy cipher suite pin",match(kind,"RS256|JWT signing"),"RS256 JWT signing",match(kind,"ECDSA P-256|CurveP256"),"ECDSA P-256 only (no hybrid)",match(kind,"pre-PQC|bcprov|pycryptodome|x/crypto"),"Pre-PQC crypto dependency",true(),"Other"), sev=case(match(kind,"RSA key generation|RSA-OAEP|RSA-PKCS1|Static.*cipher|TLS_RSA|SHA-1 cert pin"),"critical",match(kind,"RS256|ECDSA P-256|CurveP256"),"high",true(),"monitor") | stats count by pattern, sev | sort -count`, { earliest: "-30d", maxCount: 20 }),
+      this.search.query(`| index=${src} sourcetype=zeroq:crypto_finding earliest=-30d | stats dc(repo) as reposScanned, count as findings, sum(eval(if(sev=="critical",1,0))) as critical, sum(eval(if(sev=="high",1,0))) as high, sum(eval(if(sev=="monitor",1,0))) as monitor, sum(eval(if(match(kind,"RSA key generation|Static.*cipher|legacy cipher") OR match(fix,"Bump|Upgrade"),1,0))) as fixablePR`, { earliest: "-30d" }),
+      this.search.query(`| index=${src} sourcetype=zeroq:crypto_finding earliest=-30d | stats count as findings by lang | eval color=case(lang=="Java","var(--high)",lang=="Go","var(--cyan)",lang=="Python","var(--brand)",lang=="C#","var(--crit)",lang=="TypeScript","var(--safe)",true(),"var(--warn)") | sort -findings`, { earliest: "-30d", maxCount: 20 }),
+      this.search.query(`| index=${src} sourcetype=zeroq:crypto_finding earliest=-30d | eval pattern=case(match(kind,"RSA key generation|RSA-OAEP|RSA-PKCS1"),"RSA key generation / encryption",match(kind,"Static.*cipher|legacy cipher|TLS_RSA"),"Static / legacy cipher suite pin",match(kind,"RS256|JWT signing"),"RS256 JWT signing",match(kind,"ECDSA P-256|CurveP256"),"ECDSA P-256 only (no hybrid)",match(kind,"pre-PQC|bcprov|pycryptodome|x/crypto"),"Pre-PQC crypto dependency",true(),"Other"), sev=case(match(kind,"RSA key generation|RSA-OAEP|RSA-PKCS1|Static.*cipher|TLS_RSA|SHA-1 cert pin"),"critical",match(kind,"RS256|ECDSA P-256|CurveP256"),"high",true(),"monitor") | stats count by pattern, sev | sort -count`, { earliest: "-30d", maxCount: 20 }),
     ]);
     const rollup = rollupRes.results[0] || {};
     if (Number(rollup.findings || 0) === 0) return null;
@@ -329,7 +330,7 @@ export class HecSplunkClient implements SplunkClient {
   async getOrgPlan(org: string): Promise<OrgPlan | null> {
     if (!this.search.enabled) return null;
     const idx = config.splunk.indexes.plan;
-    const spl = `| index=${idx} sourcetype=cam:org_plan org="${org.replace(/"/g, '\\"')}" | sort stream_order, action_order`;
+    const spl = `| index=${idx} sourcetype=zeroq:org_plan org="${org.replace(/"/g, '\\"')}" | sort stream_order, action_order`;
     const res = await this.search.query(spl, { earliest: "-1y", maxCount: 200 });
     if (res.results.length === 0) return null;
     const streams = new Map<string, OrgPlan["streams"][number]>();

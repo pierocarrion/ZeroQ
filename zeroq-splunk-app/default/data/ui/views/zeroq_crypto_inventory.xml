@@ -1,12 +1,12 @@
 <dashboard version="1.1">
-  <label>CAM — Crypto Inventory</label>
+  <label>ZeroQ — Crypto Inventory</label>
   <description>Live TLS connections observed on the wire, indexed from Zeek ssl.log.</description>
   <row>
     <panel>
       <single>
         <title>Connections (7d)</title>
         <search>
-          <query>| index=crypto_net sourcetype=cam:tls_connection earliest=-7d | stats count</query>
+          <query>| index=crypto_net sourcetype=zeroq:tls_connection earliest=-7d | stats count</query>
           <earliest>-7d</earliest>
           <latest>now</latest>
         </search>
@@ -16,7 +16,7 @@
       <single>
         <title>Critical risk connections</title>
         <search>
-          <query>| index=crypto_net sourcetype=cam:tls_connection earliest=-7d risk=critical | stats count</query>
+          <query>| index=crypto_net sourcetype=zeroq:tls_connection earliest=-7d risk=critical | stats count</query>
         </search>
       </single>
     </panel>
@@ -24,7 +24,7 @@
       <chart>
         <title>By TLS version</title>
         <search>
-          <query>| index=crypto_net sourcetype=cam:tls_connection earliest=-7d | stats count by version</query>
+          <query>| index=crypto_net sourcetype=zeroq:tls_connection earliest=-7d | stats count by version</query>
         </search>
         <option name="charting.chart">bar</option>
       </chart>
@@ -36,7 +36,7 @@
         <title>Connection profiles</title>
         <search>
           <query>
-| index=crypto_net sourcetype=cam:tls_connection earliest=-7d
+| index=crypto_net sourcetype=zeroq:tls_connection earliest=-7d
 | sort - _time
 | table _time, server, src, dst, version, cipher, curve, risk, hosts
           </query>

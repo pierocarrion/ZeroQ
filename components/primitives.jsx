@@ -67,20 +67,14 @@ export function Icon({ name, size = 18, stroke = 1.7, fill = "none", style }) {
 }
 
 export function Logo({ size = 30 }) {
-  const id = "lg" + size;
   return (
-    <svg width={size} height={size} viewBox="0 0 40 40" fill="none">
-      <defs>
-        <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#9d8bff" />
-          <stop offset="1" stopColor="#3ad6e6" />
-        </linearGradient>
-      </defs>
-      <path d="M20 3l14 5v9c0 9-6.5 14.5-14 17C12.5 31.5 6 26 6 17V8z" fill="#0e1320" stroke={`url(#${id})`} strokeWidth="1.6" />
-      <ellipse cx="20" cy="19" rx="9" ry="3.6" stroke={`url(#${id})`} strokeWidth="1.4" transform="rotate(30 20 19)" opacity=".9" />
-      <ellipse cx="20" cy="19" rx="9" ry="3.6" stroke={`url(#${id})`} strokeWidth="1.4" transform="rotate(-30 20 19)" opacity=".9" />
-      <circle cx="20" cy="19" r="2.6" fill={`url(#${id})`} />
-    </svg>
+    <img
+      src="/zeroq-logo.png"
+      alt="ZeroQ"
+      width={size}
+      height={size}
+      style={{ display: "block", borderRadius: 6 }}
+    />
   );
 }
 

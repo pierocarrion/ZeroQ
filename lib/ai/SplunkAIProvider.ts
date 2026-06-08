@@ -10,6 +10,6 @@ export class SplunkAIProvider implements AIProvider {
   readonly name = "Splunk AI Assistant";
 
   async complete(_req: AICompletionRequest): Promise<string> {
-    return "Splunk AI Assistant integration is coming soon. Please select Anthropic Claude or Local Reasoner in Settings.";
+    return "Splunk AI Assistant integration is coming soon. Please select DeepSeek or Local Reasoner in Settings.";
   }
 }

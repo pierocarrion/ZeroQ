@@ -3,4 +3,4 @@
 // import from "@/lib/data"; the data itself lives in seed.ts.
 // ============================================================
 export { DATA } from "./seed";
-export type { CamData } from "./seed";
+export type { ZeroQData } from "./seed";

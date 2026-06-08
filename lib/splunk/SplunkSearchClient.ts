@@ -3,6 +3,7 @@
 // and returns typed results. Falls back gracefully on errors.
 // ============================================================
 import { config } from "../config";
+import { splunkFetch } from "./fetchSplunk";
 
 export interface SplunkSearchResult {
   fields: string[];
@@ -57,7 +58,7 @@ export class SplunkSearchClient {
       earliest_time: opts.earliest ?? "-24h",
       latest_time: opts.latest ?? "now",
     });
-    const res = await fetch(`${this.baseUrl}/services/search/jobs`, {
+    const res = await splunkFetch(`${this.baseUrl}/services/search/jobs`, {
       method: "POST",
       headers: { Authorization: this.auth, "Content-Type": "application/x-www-form-urlencoded" },
       body: body.toString(),
@@ -71,7 +72,7 @@ export class SplunkSearchClient {
   private async waitForJob(sid: string): Promise<void> {
     const url = `${this.baseUrl}/services/search/jobs/${sid}?output_mode=json`;
     for (let i = 0; i < 60; i++) {
-      const res = await fetch(url, { headers: { Authorization: this.auth } });
+      const res = await splunkFetch(url, { headers: { Authorization: this.auth } });
       if (!res.ok) throw new Error(`Job status failed: ${res.status}`);
       const json = (await res.json()) as any;
       const entry = json.entry?.[0];
@@ -89,7 +90,7 @@ export class SplunkSearchClient {
     const params = new URLSearchParams({ output_mode: "json" });
     if (maxCount) params.set("count", String(maxCount));
     const url = `${this.baseUrl}/services/search/jobs/${sid}/results?${params.toString()}`;
-    const res = await fetch(url, { headers: { Authorization: this.auth } });
+    const res = await splunkFetch(url, { headers: { Authorization: this.auth } });
     if (res.status === 204) return { fields: [], results: [] };
     if (!res.ok) throw new Error(`Read results failed: ${res.status}`);
     const json = (await res.json()) as { fields?: { name: string }[]; results?: Record<string, any>[] };

@@ -51,7 +51,7 @@ export function OrgPlan({ go }) {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
             <div className="card" style={{ padding: 16, display: "flex", alignItems: "center", gap: 14 }}>
               <GradeBadge grade={plan.posture} size={44} />
-              <div><div className="eyebrow">Current posture</div><div style={{ fontSize: 13, color: "var(--tx-mut)", marginTop: 3 }}>org crypto-agility grade</div></div>
+              <div><div className="eyebrow">Current posture</div><div style={{ fontSize: 13, color: "var(--tx-mut)", marginTop: 3 }}>org ZeroQ grade</div></div>
             </div>
             <div className="card" style={{ padding: 16, display: "flex", alignItems: "center", gap: 12 }}>
               <span style={{ color: "var(--tx-dim)" }}><Icon name="chevron" size={22} /></span>
@@ -117,7 +117,7 @@ const ARCH = {
       { name: "PKI / CT logs", sub: "cert inventory feed", icon: "cert" },
     ]},
     { title: "Ingest & Index", tone: "brand", nodes: [
-      { name: "CAM Collector", sub: "Next API · async fetch → HEC", icon: "download" },
+      { name: "ZeroQ Collector", sub: "Next API · async fetch → HEC", icon: "download" },
       { name: "Splunk HEC", sub: "index=crypto_source / network_ssl", icon: "inventory" },
     ]},
     { title: "Splunk Intelligence", tone: "brand", nodes: [
@@ -126,7 +126,7 @@ const ARCH = {
       { name: "Splunk hosted model + AI Assistant", sub: "reasoning · NL queries · plan synthesis", icon: "ai" },
     ]},
     { title: "App & Actions", tone: "safe", nodes: [
-      { name: "CAM Dashboard (Next.js)", sub: "React · Splunk custom app", icon: "dashboard" },
+      { name: "ZeroQ Dashboard (Next.js)", sub: "React · Splunk custom app", icon: "dashboard" },
       { name: "Agent actions", sub: "open PRs · tickets · policy", icon: "roadmap" },
     ]},
   ],
@@ -184,7 +184,7 @@ lib/
   rules.ts              # crypto rule set (extensible)
   scanning/             # detector · scoring · target
   providers/            # SourceProvider + GitHub/GitLab
-  ai/                   # AIProvider + Anthropic/Local
+  ai/                   # AIProvider + DeepSeek/Local
   splunk/               # SplunkClient + HEC/Noop
   services/             # Scan/Assistant/Plan + DI root
 components/             # React UI`}
@@ -194,7 +194,7 @@ components/             # React UI`}
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {[
               ["1", "Install", "npm install — pulls Next.js + React. No other services required to start."],
-              ["2", "Configure (optional)", "cp .env.example .env.local — add ANTHROPIC_API_KEY for live AI, GITHUB/GITLAB tokens for higher limits, Splunk HEC to push findings."],
+              ["2", "Configure (optional)", "cp .env.example .env.local — add DEEPSEEK_API_KEY for live AI, GITHUB/GITLAB tokens for higher limits, Splunk HEC to push findings."],
               ["3", "Run", "npm run dev → open http://localhost:3000. Scan a public repo immediately; AI + Splunk activate when keys are set."],
             ].map(([n, title, desc]) => (
               <div key={n} style={{ display: "flex", gap: 13 }}>
@@ -219,17 +219,17 @@ components/             # React UI`}
 export function Settings() {
   const [testing, setTesting] = useState({});
   const [config, setConfig] = useState({
-    githubToken: "", splunkHecUrl: "", splunkHecToken: "", splunkBaseUrl: "", splunkUsername: "", splunkPassword: "", anthropicApiKey: "",
+    githubOrg: "", splunkHecUrl: "", splunkHecToken: "", splunkBaseUrl: "", splunkUsername: "", splunkPassword: "", deepseekApiKey: "",
   });
 
   async function testGitHub() {
     setTesting((t) => ({ ...t, github: true }));
     try {
       const res = await fetch("/api/onboarding/test-github", {
-        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: config.githubToken }),
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ org: config.githubOrg }),
       });
       const data = await res.json();
-      setTesting((t) => ({ ...t, github: data.ok ? "ok" : "error", githubMsg: data.ok ? `Connected as ${data.login}` : data.error }));
+      setTesting((t) => ({ ...t, github: data.ok ? "ok" : "error", githubMsg: data.ok ? `${data.login} · ${data.publicRepos ?? "?"} public repos` : data.error }));
     } catch (e) {
       setTesting((t) => ({ ...t, github: "error", githubMsg: e?.message }));
     }
@@ -255,13 +255,13 @@ export function Settings() {
       const res = await fetch("/api/onboarding/config", {
         method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          githubToken: config.githubToken,
+          githubOrg: config.githubOrg,
           splunkHecUrl: config.splunkHecUrl,
           splunkHecToken: config.splunkHecToken,
           splunkBaseUrl: config.splunkBaseUrl,
           splunkUsername: config.splunkUsername,
           splunkPassword: config.splunkPassword,
-          anthropicApiKey: config.anthropicApiKey,
+          deepseekApiKey: config.deepseekApiKey,
         }),
       });
       const data = await res.json();
@@ -285,16 +285,16 @@ export function Settings() {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          {/* GitHub */}
+          {/* GitHub Org */}
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--tx-hi)" }}>GitHub</span>
-              {testing.github === "ok" && <Tag tone="safe">Connected</Tag>}
+              <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--tx-hi)" }}>GitHub Organization</span>
+              {testing.github === "ok" && <Tag tone="safe">Found</Tag>}
               {testing.github === "error" && <Tag tone="crit">{testing.githubMsg}</Tag>}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10 }}>
-              <input type="password" value={config.githubToken} onChange={(e) => setConfig((c) => ({ ...c, githubToken: e.target.value }))} placeholder="ghp_xxxxxxxxxxxx" style={inputStyle} />
-              <button onClick={testGitHub} disabled={testing.github === true} style={{ ...linkBtn, padding: "0 14px", height: 40 }}>{testing.github === true ? <Spinner size={14} /> : "Test"}</button>
+              <input value={config.githubOrg} onChange={(e) => setConfig((c) => ({ ...c, githubOrg: e.target.value }))} placeholder="e.g. facebook, microsoft, vercel" style={inputStyle} />
+              <button onClick={testGitHub} disabled={testing.github === true} style={{ ...linkBtn, padding: "0 14px", height: 40 }}>{testing.github === true ? <Spinner size={14} /> : "Check"}</button>
             </div>
           </div>
 
@@ -327,7 +327,7 @@ export function Settings() {
           {/* AI */}
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--tx-hi)" }}>AI Provider</span>
-            <input type="password" value={config.anthropicApiKey} onChange={(e) => setConfig((c) => ({ ...c, anthropicApiKey: e.target.value }))} placeholder="Anthropic API Key (optional)" style={inputStyle} />
+            <input type="password" value={config.deepseekApiKey} onChange={(e) => setConfig((c) => ({ ...c, deepseekApiKey: e.target.value }))} placeholder="DeepSeek API Key (optional)" style={inputStyle} />
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4 }}>
@@ -344,9 +344,9 @@ export function Settings() {
         <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--tx-hi)", marginBottom: 10 }}>Ingestion guides</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {[
-            { label: "Network (Zeek) → crypto_net", desc: "Forward ssl.log and x509.log to Splunk HEC with sourcetype cam:tls_connection." },
-            { label: "Certificates → crypto_pki", desc: "Export X.509 metadata (subject, alg, bits, expiry) to Splunk HEC with sourcetype cam:cert." },
-            { label: "HNDL → crypto_hndl", desc: "Send anomaly events (dst, volume, deviation) to Splunk HEC with sourcetype cam:hndl_event." },
+            { label: "Network (Zeek) → crypto_net", desc: "Forward ssl.log and x509.log to Splunk HEC with sourcetype zeroq:tls_connection." },
+            { label: "Certificates → crypto_pki", desc: "Export X.509 metadata (subject, alg, bits, expiry) to Splunk HEC with sourcetype zeroq:cert." },
+            { label: "HNDL → crypto_hndl", desc: "Send anomaly events (dst, volume, deviation) to Splunk HEC with sourcetype zeroq:hndl_event." },
           ].map((g) => (
             <div key={g.label} style={{ display: "flex", flexDirection: "column", gap: 2, padding: "10px 12px", background: "var(--bg-inset)", borderRadius: 9, border: "1px solid var(--line)" }}>
               <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--tx-hi)" }}>{g.label}</span>

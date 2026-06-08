@@ -35,7 +35,7 @@ const NAV = [
 ];
 
 const TITLES = {
-  dashboard: ["Quantum Risk Dashboard", "Real-time crypto-agility posture across the network"],
+  dashboard: ["Quantum Risk Dashboard", "Real-time ZeroQ posture across the network"],
   inventory: ["Crypto Inventory", "Every cipher suite & TLS profile observed on the wire"],
   certs: ["Certificate Migration Planner", "Quantum-vulnerable certificates ranked by expiry"],
   repos: ["Repository Scanner", "Live-scan any public GitHub or GitLab repo for crypto-in-code"],
@@ -73,7 +73,7 @@ function Sidebar({ active, go, splunkLive }) {
       <Link href="/" style={{ padding: "18px 18px 16px", display: "flex", alignItems: "center", gap: 11, borderBottom: "1px solid var(--line)", textDecoration: "none" }}>
         <Logo size={32} />
         <div style={{ lineHeight: 1.2 }}>
-          <div style={{ fontWeight: 600, color: "var(--tx-hi)", fontSize: 14 }}>Crypto-Agility</div>
+          <div style={{ fontWeight: 600, color: "var(--tx-hi)", fontSize: 14 }}>ZeroQ</div>
           <div style={{ fontSize: 11, color: "var(--tx-mut)", letterSpacing: ".04em" }}>MONITOR</div>
         </div>
       </Link>
@@ -85,7 +85,7 @@ function Sidebar({ active, go, splunkLive }) {
               {sec.items.map((it) => {
                 const on = active === it.id;
                 return (
-                  <button key={it.id} onClick={() => go(it.id)} className={"cam-nav-btn" + (on ? " active" : "")} style={{ display: "flex", alignItems: "center", gap: 11, padding: "9px 10px", borderRadius: 9, border: "none", cursor: "pointer", fontFamily: "var(--font)", fontSize: 13.5, fontWeight: 500, textAlign: "left", width: "100%", position: "relative", color: on ? "var(--tx-hi)" : "var(--tx-mut)" }}>
+                  <button key={it.id} onClick={() => go(it.id)} className={"zeroq-nav-btn" + (on ? " active" : "")} style={{ display: "flex", alignItems: "center", gap: 11, padding: "9px 10px", borderRadius: 9, border: "none", cursor: "pointer", fontFamily: "var(--font)", fontSize: 13.5, fontWeight: 500, textAlign: "left", width: "100%", position: "relative", color: on ? "var(--tx-hi)" : "var(--tx-mut)" }}>
                     <span style={{ color: on ? "var(--brand-2)" : "var(--tx-dim)", display: "flex" }}><Icon name={it.icon} size={17} fill={it.icon === "ai" ? "currentColor" : "none"} stroke={it.icon === "ai" ? 0 : 1.7} /></span>
                     <span style={{ flex: 1 }}>{it.label}</span>
                     {it.alert && <span style={{ width: 7, height: 7, borderRadius: 999, background: "var(--crit)", animation: "pulse-dot 1.6s infinite" }} />}
@@ -162,10 +162,10 @@ export default function AppShell() {
   const scrollRef = useRef(null);
   const go = (id) => {
     setActive(id);
-    try { localStorage.setItem("cam.screen", id); } catch {}
+    try { localStorage.setItem("zeroq.screen", id); } catch {}
   };
   useEffect(() => {
-    try { const s = localStorage.getItem("cam.screen"); if (s && TITLES[s]) setActive(s); } catch {}
+    try { const s = localStorage.getItem("zeroq.screen"); if (s && TITLES[s]) setActive(s); } catch {}
   }, []);
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 0; }, [active]);
   useEffect(() => {

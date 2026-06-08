@@ -6,7 +6,7 @@ import type { AIProvider } from "../ai/AIProvider";
 import type { ScanResult } from "../types";
 import type { SplunkClient } from "../splunk/SplunkClient";
 
-const SYSTEM = `You are the Crypto-Agility Agent. Produce a prioritized post-quantum migration plan for an engineering organization, as STRICT JSON only (no prose, no markdown fences).
+const SYSTEM = `You are the ZeroQ Agent. Produce a prioritized post-quantum migration plan for an engineering organization, as STRICT JSON only (no prose, no markdown fences).
 
 Schema:
 {
@@ -66,7 +66,7 @@ export class PlanService {
     return {
       org,
       generated: "just now",
-      summary: "Auto-prioritized migration plan based on the built-in rule set. Set ANTHROPIC_API_KEY to enable AI-generated plans.",
+      summary: "Auto-prioritized migration plan based on the built-in rule set. Set DEEPSEEK_API_KEY to enable AI-generated plans.",
       posture: "D+",
       targetPosture: "A",
       weeks: 12,
@@ -94,7 +94,7 @@ export class PlanService {
           tone: "safe",
           window: "6-12 weeks",
           actions: [
-            { repo: "example-org/infra", task: "Publish crypto-agility policy: no new RSA < 3072, no ECDSA P-256, pinned TLS", pr: "draft", effort: "3d" },
+            { repo: "example-org/infra", task: "Publish ZeroQ policy: no new RSA < 3072, no ECDSA P-256, pinned TLS", pr: "draft", effort: "3d" },
             { repo: "example-org/pki", task: "Renew certificates expiring within 90 days using ML-DSA-65 instead of RSA", pr: "draft", effort: "4d" },
           ],
         },

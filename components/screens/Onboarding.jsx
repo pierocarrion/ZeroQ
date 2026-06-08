@@ -68,7 +68,7 @@ function Card({ children, style }) {
 function WelcomeStep({ onNext }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      <h1 style={{ margin: 0, fontSize: 24, fontWeight: 600, color: "var(--tx-hi)" }}>Welcome to Crypto-Agility Monitor</h1>
+      <h1 style={{ margin: 0, fontSize: 24, fontWeight: 600, color: "var(--tx-hi)" }}>Welcome to ZeroQ</h1>
       <p style={{ fontSize: 14.5, color: "var(--tx-mut)", lineHeight: 1.6, margin: 0 }}>
         This tool inventories every quantum-vulnerable cipher across your <strong>code</strong> and <strong>network</strong>,
         then produces a prioritized migration plan backed by your Splunk instance.
@@ -98,77 +98,42 @@ function WelcomeStep({ onNext }) {
 function GitHubStep({ config, setConfig, onNext }) {
   const [testing, setTesting] = useState(false);
   const [testOk, setTestOk] = useState(null);
-  const [orgs, setOrgs] = useState([]);
-  const [loadingOrgs, setLoadingOrgs] = useState(false);
 
-  async function testToken() {
+  async function testOrg() {
     setTesting(true); setTestOk(null);
     try {
       const res = await fetch("/api/onboarding/test-github", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ token: config.githubToken }),
+        body: JSON.stringify({ org: config.githubOrg }),
       });
       const data = await res.json();
-      setTestOk(data.ok ? { ok: true, login: data.login } : { ok: false, error: data.error });
-      if (data.ok) loadOrgs(config.githubToken);
+      setTestOk(data.ok ? { ok: true, login: data.login, publicRepos: data.publicRepos } : { ok: false, error: data.error });
     } catch (e) {
       setTestOk({ ok: false, error: e?.message || "Network error" });
     } finally { setTesting(false); }
   }
 
-  async function loadOrgs(token) {
-    setLoadingOrgs(true);
-    try {
-      const res = await fetch(`/api/github/orgs?token=${encodeURIComponent(token)}`);
-      const data = await res.json();
-      setOrgs(data.data || []);
-    } catch { setOrgs([]); }
-    finally { setLoadingOrgs(false); }
-  }
-
   useEffect(() => {
-    if (config.githubToken && config.githubToken.startsWith("ghp_")) {
-      testToken();
-    }
+    if (config.githubOrg) testOrg();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: "var(--tx-hi)" }}>Connect GitHub</h2>
+      <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: "var(--tx-hi)" }}>GitHub Organization</h2>
       <p style={{ fontSize: 13.5, color: "var(--tx-mut)", margin: 0 }}>
-        We need a Personal Access Token to list your organization repositories and scan them for quantum-vulnerable crypto.
-        The token needs <code style={{ background: "var(--bg-inset)", padding: "1px 5px", borderRadius: 5, fontSize: 12 }}>repo</code> scope for private repos, or no scope for public repos only.
+        Enter the GitHub organization name to scan its <strong>public repositories</strong> for quantum-vulnerable cryptography.
+        No token or login required — we read public repos directly from GitHub's API.
       </p>
-      <Input label="GitHub Personal Access Token" type="password" value={config.githubToken} onChange={(v) => { setConfig((c) => ({ ...c, githubToken: v })); setTestOk(null); setOrgs([]); }} placeholder="ghp_xxxxxxxxxxxx" />
+      <Input label="Organization name" value={config.githubOrg} onChange={(v) => { setConfig((c) => ({ ...c, githubOrg: v.trim() })); setTestOk(null); }} placeholder="e.g. facebook, microsoft, vercel" />
       <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-        <button onClick={testToken} disabled={testing || !config.githubToken} style={{ ...linkBtn, padding: "8px 14px" }}>
-          {testing ? <Spinner size={14} /> : <Icon name="refresh" size={14} />} Test connection
+        <button onClick={testOrg} disabled={testing || !config.githubOrg} style={{ ...linkBtn, padding: "8px 14px" }}>
+          {testing ? <Spinner size={14} /> : <Icon name="refresh" size={14} />} Check organization
         </button>
         {testOk && (
-          <Tag tone={testOk.ok ? "safe" : "crit"}>{testOk.ok ? `Connected as ${testOk.login}` : testOk.error}</Tag>
+          <Tag tone={testOk.ok ? "safe" : "crit"}>{testOk.ok ? `${testOk.login} · ${testOk.publicRepos ?? "?"} public repos` : testOk.error}</Tag>
         )}
       </div>
-
-      {orgs.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 4 }}>
-          <label style={{ fontSize: 12.5, fontWeight: 600, color: "var(--tx-hi)" }}>Select organization</label>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
-            {orgs.map((o) => (
-              <button key={o.login} onClick={() => setConfig((c) => ({ ...c, githubOrg: o.login }))}
-                style={{
-                  display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10,
-                  border: `1px solid ${config.githubOrg === o.login ? "var(--brand)" : "var(--line)"}`,
-                  background: config.githubOrg === o.login ? "var(--brand-dim)" : "var(--bg-2)",
-                  cursor: "pointer", color: "var(--tx)", fontFamily: "var(--font)", fontSize: 13,
-                }}>
-                {o.avatar_url && <img src={o.avatar_url} alt="" width={24} height={24} style={{ borderRadius: 6 }} />}
-                <span style={{ fontWeight: 600 }}>{o.login}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
         <button onClick={onNext} disabled={!testOk?.ok} style={{ ...linkBtn, padding: "10px 18px", background: "var(--brand)", color: "#fff", borderColor: "var(--brand)", fontWeight: 600, fontSize: 14 }}>
@@ -195,6 +160,7 @@ function SplunkStep({ config, setConfig, onNext }) {
           baseUrl: config.splunkBaseUrl,
           username: config.splunkUsername,
           password: config.splunkPassword,
+          skipTlsVerify: config.splunkSkipTlsVerify === "true",
         }),
       });
       const data = await res.json();
@@ -206,6 +172,7 @@ function SplunkStep({ config, setConfig, onNext }) {
 
   const hecOk = testResult?.checks?.hec?.ok;
   const restOk = testResult?.checks?.rest?.ok;
+  const canContinue = testResult && (hecOk || restOk);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
@@ -230,10 +197,20 @@ function SplunkStep({ config, setConfig, onNext }) {
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <Input label="Base URL" value={config.splunkBaseUrl} onChange={(v) => setConfig((c) => ({ ...c, splunkBaseUrl: v }))} placeholder="https://tenant.splunkcloud.com" />
-          <Input label="Username" value={config.splunkUsername} onChange={(v) => setConfig((c) => ({ ...c, splunkUsername: v }))} placeholder="cam_api" />
+          <Input label="Username" value={config.splunkUsername} onChange={(v) => setConfig((c) => ({ ...c, splunkUsername: v }))} placeholder="zeroq_api" />
           <Input label="Password" type="password" value={config.splunkPassword} onChange={(v) => setConfig((c) => ({ ...c, splunkPassword: v }))} placeholder="" />
         </div>
       </div>
+
+      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--tx-mut)", cursor: "pointer" }}>
+        <input
+          type="checkbox"
+          checked={config.splunkSkipTlsVerify === "true"}
+          onChange={(e) => setConfig((c) => ({ ...c, splunkSkipTlsVerify: e.target.checked ? "true" : "" }))}
+          style={{ accentColor: "var(--brand)" }}
+        />
+        Skip TLS certificate verification (local dev only)
+      </label>
 
       <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
         <button onClick={testConnection} disabled={testing} style={{ ...linkBtn, padding: "8px 14px" }}>
@@ -242,13 +219,13 @@ function SplunkStep({ config, setConfig, onNext }) {
         {testResult && (
           <div style={{ display: "flex", gap: 8 }}>
             <Tag tone={hecOk ? "safe" : "crit"}>{hecOk ? "HEC OK" : "HEC fail"}</Tag>
-            <Tag tone={restOk ? "safe" : "crit"}>{restOk ? "REST OK" : "REST fail"}</Tag>
+            <Tag tone={restOk ? "safe" : restOk === false ? "warn" : "mut"}>{restOk ? "REST OK" : restOk === false ? "REST unavailable" : "REST untested"}</Tag>
           </div>
         )}
       </div>
 
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
-        <button onClick={onNext} disabled={!testResult?.ok} style={{ ...linkBtn, padding: "10px 18px", background: "var(--brand)", color: "#fff", borderColor: "var(--brand)", fontWeight: 600, fontSize: 14 }}>
+        <button onClick={onNext} disabled={!canContinue} style={{ ...linkBtn, padding: "10px 18px", background: "var(--brand)", color: "#fff", borderColor: "var(--brand)", fontWeight: 600, fontSize: 14 }}>
           Continue <Icon name="chevron" size={14} />
         </button>
       </div>
@@ -265,11 +242,11 @@ function ScanStep({ config, onNext }) {
   const [scanResult, setScanResult] = useState(null);
 
   useEffect(() => {
-    if (!config.githubOrg || !config.githubToken) return;
+    if (!config.githubOrg) return;
     async function load() {
       setLoading(true);
       try {
-        const res = await fetch(`/api/github/repos?org=${encodeURIComponent(config.githubOrg)}&token=${encodeURIComponent(config.githubToken)}`);
+        const res = await fetch(`/api/github/repos?org=${encodeURIComponent(config.githubOrg)}`);
         const data = await res.json();
         const list = data.data || [];
         setRepos(list);
@@ -278,7 +255,7 @@ function ScanStep({ config, onNext }) {
       finally { setLoading(false); }
     }
     load();
-  }, [config.githubOrg, config.githubToken]);
+  }, [config.githubOrg]);
 
   async function runScan() {
     const targets = Array.from(selected);
@@ -358,13 +335,14 @@ function AIStep({ config, setConfig, onFinish }) {
       const res = await fetch("/api/onboarding/config", {
         method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          githubToken: config.githubToken,
           splunkHecUrl: config.splunkHecUrl,
           splunkHecToken: config.splunkHecToken,
           splunkBaseUrl: config.splunkBaseUrl,
           splunkUsername: config.splunkUsername,
           splunkPassword: config.splunkPassword,
-          anthropicApiKey: config.anthropicApiKey,
+          splunkSkipTlsVerify: config.splunkSkipTlsVerify,
+          deepseekApiKey: config.deepseekApiKey,
+          aiProvider: config.aiProvider,
         }),
       });
       const data = await res.json();
@@ -385,7 +363,7 @@ function AIStep({ config, setConfig, onFinish }) {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {[
-          { key: "anthropic", label: "Anthropic Claude", desc: "Best reasoning. Requires API key.", available: true },
+          { key: "deepseek", label: "DeepSeek", desc: "Fast & cost-effective. Requires API key.", available: true },
           { key: "local", label: "Local Reasoner", desc: "Deterministic fallback. No API key needed.", available: true },
           { key: "splunk", label: "Splunk AI Assistant", desc: "Coming soon. Will use on-platform Splunk AI.", available: false },
         ].map((opt) => (
@@ -404,9 +382,10 @@ function AIStep({ config, setConfig, onFinish }) {
         ))}
       </div>
 
-      {config.aiProvider === "anthropic" && (
-        <Input label="Anthropic API Key" type="password" value={config.anthropicApiKey} onChange={(v) => setConfig((c) => ({ ...c, anthropicApiKey: v }))} placeholder="sk-ant-..." />
+      {config.aiProvider === "deepseek" && (
+        <Input label="DeepSeek API Key" type="password" value={config.deepseekApiKey} onChange={(v) => setConfig((c) => ({ ...c, deepseekApiKey: v }))} placeholder="sk-..." />
       )}
+
 
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
         <button onClick={saveAndFinish} disabled={saving || saved} style={{ ...linkBtn, padding: "10px 18px", background: saved ? "var(--safe)" : "var(--brand)", color: "#fff", borderColor: saved ? "var(--safe)" : "var(--brand)", fontWeight: 600, fontSize: 14 }}>
@@ -426,16 +405,38 @@ export default function Onboarding() {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [config, setConfig] = useState({
-    githubToken: "",
     githubOrg: "",
     splunkHecUrl: "",
     splunkHecToken: "",
     splunkBaseUrl: "",
     splunkUsername: "",
     splunkPassword: "",
-    anthropicApiKey: "",
-    aiProvider: "anthropic",
+    splunkSkipTlsVerify: "",
+    deepseekApiKey: "",
+    aiProvider: "deepseek",
   });
+
+  useEffect(() => {
+    fetch("/api/onboarding/config")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.ok) {
+          setConfig((c) => ({
+            ...c,
+            githubOrg: data.githubOrg || c.githubOrg,
+            splunkHecUrl: data.splunkHecUrl || c.splunkHecUrl,
+            splunkHecToken: data.splunkHecToken || c.splunkHecToken,
+            splunkBaseUrl: data.splunkBaseUrl || c.splunkBaseUrl,
+            splunkUsername: data.splunkUsername || c.splunkUsername,
+            splunkPassword: data.splunkPassword || c.splunkPassword,
+            splunkSkipTlsVerify: data.splunkSkipTlsVerify || c.splunkSkipTlsVerify,
+            deepseekApiKey: data.deepseekApiKey || c.deepseekApiKey,
+            aiProvider: data.aiProvider || c.aiProvider,
+          }));
+        }
+      })
+      .catch(() => { /* ignore */ });
+  }, []);
 
   const next = () => setStep((s) => Math.min(s + 1, STEPS.length - 1));
   const finish = () => router.push("/app");
@@ -444,7 +445,7 @@ export default function Onboarding() {
     <div style={{ minHeight: "100vh", background: "var(--bg-0)", display: "flex", flexDirection: "column", alignItems: "center", padding: "40px 24px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28 }}>
         <Logo size={32} />
-        <span style={{ fontWeight: 600, color: "var(--tx-hi)", fontSize: 15 }}>Crypto-Agility Monitor</span>
+        <span style={{ fontWeight: 600, color: "var(--tx-hi)", fontSize: 15 }}>ZeroQ</span>
       </div>
       <Card>
         <StepNav step={step} total={STEPS.length} />

@@ -36,16 +36,16 @@ export function Assistant() {
   const runSplunkTool = async (q) => {
     const lower = q.toLowerCase();
     if (lower.includes("cert") && lower.includes("expire")) {
-      return apiSplunkQuery("| index=crypto_pki sourcetype=cam:cert | where expiry<30 | stats count");
+      return apiSplunkQuery("| index=crypto_pki sourcetype=zeroq:cert | where expiry<30 | stats count");
     }
     if (lower.includes("tls 1.0") || lower.includes("tls 1.1")) {
-      return apiSplunkQuery('| index=crypto_net sourcetype=cam:tls_connection version IN ("TLS 1.0","TLS 1.1") | stats count by server, version');
+      return apiSplunkQuery('| index=crypto_net sourcetype=zeroq:tls_connection version IN ("TLS 1.0","TLS 1.1") | stats count by server, version');
     }
     if (lower.includes("critical") || lower.includes("crítico")) {
-      return apiSplunkQuery("| index=crypto_source sourcetype=cam:crypto_finding sev=critical | stats count by repo");
+      return apiSplunkQuery("| index=crypto_source sourcetype=zeroq:crypto_finding sev=critical | stats count by repo");
     }
     if (lower.includes("rsa")) {
-      return apiSplunkQuery("| index=crypto_source sourcetype=cam:crypto_finding | search kind=*RSA* | stats count by repo, kind");
+      return apiSplunkQuery("| index=crypto_source sourcetype=zeroq:crypto_finding | search kind=*RSA* | stats count by repo, kind");
     }
     return null;
   };

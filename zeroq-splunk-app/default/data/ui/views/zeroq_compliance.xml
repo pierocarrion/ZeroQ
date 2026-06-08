@@ -1,14 +1,14 @@
 <dashboard version="1.1">
-  <label>CAM — Compliance</label>
-  <description>Crypto-agility posture mapped to NIST, NSA and CISA deadlines.</description>
+  <label>ZeroQ — Compliance</label>
+  <description>ZeroQ posture mapped to NIST, NSA and CISA deadlines.</description>
   <row>
     <panel>
       <chart>
         <title>Findings by framework</title>
         <search>
           <query>
-| index=crypto_source sourcetype=cam:crypto_finding earliest=-90d
-| lookup cam_compliance_mapping rule OUTPUT framework
+| index=crypto_source sourcetype=zeroq:crypto_finding earliest=-90d
+| lookup zeroq_compliance_mapping rule OUTPUT framework
 | stats count by framework
           </query>
           <earliest>-90d</earliest>
@@ -22,8 +22,8 @@
         <title>Findings at risk by rule</title>
         <search>
           <query>
-| index=crypto_source sourcetype=cam:crypto_finding earliest=-90d
-| lookup cam_compliance_mapping rule OUTPUT framework, authority, desc
+| index=crypto_source sourcetype=zeroq:crypto_finding earliest=-90d
+| lookup zeroq_compliance_mapping rule OUTPUT framework, authority, desc
 | stats count by framework, rule, desc
 | sort -count
           </query>

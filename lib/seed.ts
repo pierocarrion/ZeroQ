@@ -116,7 +116,7 @@ export const DATA = {
       { asset: "partner-edi.dmz", action: "Coordinate PQC-capable TLS with B2B partners", effort: "2 wks", impact: "Closes external legacy-TLS exposure", why: "TLS 1.1 forced by partner endpoint." },
     ]},
     { phase: "Phase 3 · Sustain & verify", window: "Weeks 10–16", tone: "safe", items: [
-      { asset: "Fleet-wide", action: "Set crypto policy: TLS 1.3 + hybrid PQC default, alert on regressions", effort: "ongoing", impact: "Locks in target state, prevents drift", why: "Continuous crypto-agility posture." },
+      { asset: "Fleet-wide", action: "Set crypto policy: TLS 1.3 + hybrid PQC default, alert on regressions", effort: "ongoing", impact: "Locks in target state, prevents drift", why: "Continuous ZeroQ posture." },
       { asset: "PKI", action: "Migrate Internal PKI Root to ML-DSA; auto-issue PQC certs", effort: "1 wk", impact: "Quantum-safe certificate supply chain", why: "Removes RSA from the trust root." },
     ]},
   ],
@@ -199,7 +199,7 @@ export const DATA = {
       ]},
       { title: "Signing & policy", tone: "safe", window: "Weeks 6–12", actions: [
         { repo: "org-wide", task: "Migrate RS256 JWT signing → ML-DSA-65 across services", pr: "rollout", effort: "2wk" },
-        { repo: "CI/CD", task: "Add crypto-agility lint gate — block new RSA/ECDSA in PRs", pr: "policy", effort: "3d" },
+        { repo: "CI/CD", task: "Add ZeroQ lint gate — block new RSA/ECDSA in PRs", pr: "policy", effort: "3d" },
       ]},
     ],
   },
@@ -211,7 +211,7 @@ export const DATA = {
         { name: "PKI / CT logs", sub: "cert inventory feed", icon: "cert" },
       ]},
       { title: "Ingest & Index", tone: "brand", nodes: [
-        { name: "CAM Collector", sub: "Next API · async fetch → HEC", icon: "download" },
+        { name: "ZeroQ Collector", sub: "Next API · async fetch → HEC", icon: "download" },
         { name: "Splunk HEC", sub: "index=crypto_source / network_ssl", icon: "inventory" },
       ]},
       { title: "Splunk Intelligence", tone: "brand", nodes: [
@@ -220,7 +220,7 @@ export const DATA = {
         { name: "Splunk hosted model + AI Assistant", sub: "reasoning · NL queries · plan synthesis", icon: "ai" },
       ]},
       { title: "App & Actions", tone: "safe", nodes: [
-        { name: "CAM Dashboard (Next.js)", sub: "React · Splunk custom app", icon: "dashboard" },
+        { name: "ZeroQ Dashboard (Next.js)", sub: "React · Splunk custom app", icon: "dashboard" },
         { name: "Agent actions", sub: "open PRs · tickets · policy", icon: "roadmap" },
       ]},
     ],
@@ -242,8 +242,8 @@ export const DATA = {
     { label: "Detect crypto", tool: "pattern corpus · 12 rules", logs: [
       { t: "info", text: "loading quantum-vulnerable pattern corpus (12 rules)" },
       { t: "ai", text: "scanning Java · Go · Python · C# · Kotlin · TS …" },
-      { t: "crit", text: "! payments-service  RSA key generation  (CAM-RSA-KEYGEN)" },
-      { t: "crit", text: "! partner-edi       TLS 1.0/1.1 fallback  (CAM-LEGACY-TLS)" },
+      { t: "crit", text: "! payments-service  RSA key generation  (ZQ-RSA-KEYGEN)" },
+      { t: "crit", text: "! partner-edi       TLS 1.0/1.1 fallback  (ZQ-LEGACY-TLS)" },
       { t: "warn", text: "~ 9 repos          pre-PQC crypto dependency" },
       { t: "ok", text: "✓ 36 findings · 13 critical · 12 high · 11 monitor" },
     ]},
@@ -263,7 +263,7 @@ export const DATA = {
       { t: "info", text: "synthesizing remediation + codemods" },
       { t: "ai", text: "opening fix PRs for auto-fixable findings…" },
       { t: "ok", text: "✓ 28/36 auto-fixable · PR #1842, #318, #211 drafted" },
-      { t: "ok", text: "✓ plan written → index=crypto_source sourcetype=cam:plan" },
+      { t: "ok", text: "✓ plan written → index=crypto_source sourcetype=zeroq:plan" },
     ]},
   ],
   scanRun: [
@@ -282,10 +282,10 @@ export const DATA = {
       { t: "ok", text: "✓ 36 findings written to Splunk" },
     ]},
     { label: "Score & grade", tool: "risk model", logs: [
-      { t: "info", text: "computing per-repo crypto-agility grade" },
+      { t: "info", text: "computing per-repo ZeroQ grade" },
       { t: "ok", text: "✓ org grade D+ · 7 repos need immediate attention" },
     ]},
   ],
 } as const;
 
-export type CamData = typeof DATA;
+export type ZeroQData = typeof DATA;

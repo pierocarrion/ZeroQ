@@ -96,7 +96,7 @@ function makeEvents(items, index, sourcetype, host) {
   return items.map((it, i) => ({
     time: nowSec - i * 60,
     host,
-    source: "cam:seed",
+    source: "zeroq:seed",
     sourcetype,
     index,
     event: it,
@@ -120,9 +120,9 @@ async function sendBatch(events) {
 
 (async () => {
   try {
-    const netEvents = makeEvents(inventory, INDEX_NET, "cam:tls_connection", "zeek-01");
-    const pkiEvents = makeEvents(certs, INDEX_PKI, "cam:cert", "pki-collector");
-    const hndlEvents = makeEvents(hndlAnomalies, INDEX_HNDL, "cam:hndl_event", "hndl-detector");
+    const netEvents = makeEvents(inventory, INDEX_NET, "zeroq:tls_connection", "zeek-01");
+    const pkiEvents = makeEvents(certs, INDEX_PKI, "zeroq:cert", "pki-collector");
+    const hndlEvents = makeEvents(hndlAnomalies, INDEX_HNDL, "zeroq:hndl_event", "hndl-detector");
 
     const netRes = await sendBatch(netEvents);
     const pkiRes = await sendBatch(pkiEvents);

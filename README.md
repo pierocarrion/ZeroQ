@@ -1,4 +1,4 @@
-# Crypto-Agility Monitor — Next.js + Splunk
+# ZeroQ — Next.js + Splunk
 
 > **Splunk Agentic Ops Hackathon · Security track**  
 > Find every quantum-vulnerable cryptographic usage across your **code** and your
@@ -10,14 +10,14 @@ A full **Next.js 14 (App Router + TypeScript)** application with a real backend:
 - **Real repository scanning** — `/api/scan` fetches any public GitHub or GitLab repo
   server-side and runs an 18-rule quantum-vulnerable crypto detector (`lib/scanning/`)
   over the source, returning findings down to `file:line` with a remediation for each.
-- **Real AI** — `/api/assistant` and `/api/plan` call an LLM (Anthropic) grounded on your
+- **Real AI** — `/api/assistant` and `/api/plan` call an LLM (DeepSeek) grounded on your
   live posture + scanned repos. No key? A deterministic local reasoner keeps it functional.
 - **Real Splunk integration** — push **and** read from Splunk:
-  - `/api/scan` + `/api/ingest` push findings to **Splunk HEC** (`cam:crypto_finding`).
+  - `/api/scan` + `/api/ingest` push findings to **Splunk HEC** (`zeroq:crypto_finding`).
   - `/api/inventory`, `/api/certs`, `/api/hndl`, `/api/compliance`, `/api/risk` read live data
     from Splunk via the **REST Search API**.
   - `/api/splunk/query` lets the AI Assistant run controlled SPL queries for grounded answers.
-- **Splunk App** — `cam-splunk-app/` contains dashboards nativos para Risk, Inventory, PKI,
+- **Splunk App** — `zeroq-splunk-app/` contains dashboards nativos para Risk, Inventory, PKI,
   HNDL y Compliance, con saved searches y alertas listas para instalar.
 - **Marketing landing page** at `/`, the full dashboard at `/app`.
 
@@ -43,7 +43,7 @@ seed/demo data; connect Splunk to unlock live dashboards.
 2. Enable **HTTP Event Collector** and create a token with access to these indexes:
    `crypto_source`, `crypto_net`, `crypto_pki`, `crypto_hndl`, `crypto_plan`.
 3. Create those 5 indexes in Splunk Web.
-4. Create a user (e.g. `cam_api`) with search access to the indexes.
+4. Create a user (e.g. `zeroq_api`) with search access to the indexes.
 5. Copy `.env.example` to `.env.local` and fill in HEC + REST API credentials.
 6. Seed demo data into Splunk:
    ```bash
@@ -51,11 +51,11 @@ seed/demo data; connect Splunk to unlock live dashboards.
    ```
 7. Install the Splunk App:
    ```bash
-   cd cam-splunk-app
-   tar -czvf ../cam-splunk-app.spl .
+   cd zeroq-splunk-app
+   tar -czvf ../zeroq-splunk-app.spl .
    ```
    Then in Splunk Web: **Apps → Manage Apps → Install app from file** and upload
-   `cam-splunk-app.spl`.
+   `zeroq-splunk-app.spl`.
 
 A full runbook with screenshots and troubleshooting is in [`DEMO.md`](./DEMO.md).
 
@@ -69,9 +69,9 @@ cp .env.example .env.local
 
 | Variable | Effect |
 |---|---|
-| `ANTHROPIC_API_KEY` | Turns the AI Assistant & Org Plan into live model calls (otherwise a local reasoner answers). |
+| `DEEPSEEK_API_KEY` | Turns the AI Assistant & Org Plan into live model calls (otherwise a local reasoner answers). |
 | `GITHUB_TOKEN` / `GITLAB_TOKEN` | Raises API rate limits and allows scanning private repos. |
-| `SPLUNK_HEC_URL` + `SPLUNK_HEC_TOKEN` | Push findings to Splunk HEC as `cam:crypto_finding` events. |
+| `SPLUNK_HEC_URL` + `SPLUNK_HEC_TOKEN` | Push findings to Splunk HEC as `zeroq:crypto_finding` events. |
 | `SPLUNK_BASE_URL` + `SPLUNK_USERNAME` + `SPLUNK_PASSWORD` | Read live posture data from Splunk Search API. |
 | `SPLUNK_INDEX_NET` / `PKI` / `HNDL` / `PLAN` | Target indexes for network, certificate, HNDL and plan data. |
 
@@ -92,7 +92,7 @@ lib/
   scanning/         detector · scoring · target        (pure functions, SRP)
   providers/        SourceProvider (interface) ← GitHubProvider, GitLabProvider (LSP)
                     + sourceProviderFactory             (OCP: add a host, add a case)
-  ai/               AIProvider (interface) ← AnthropicProvider, LocalReasoner
+  ai/               AIProvider (interface) ← DeepSeekProvider, LocalReasoner
                     + aiFactory
   splunk/           SplunkClient (interface) ← HecSplunkClient, NoopSplunkClient
                     + SplunkSearchClient for REST SPL queries
@@ -100,7 +100,7 @@ lib/
                     composition.ts = composition root (wires concretions; DIP)
 seed.ts data.ts     demo dataset + barrel
 components/          React UI (client components)
-cam-splunk-app/      Splunk app with dashboards, saved searches, alerts and lookups
+zeroq-splunk-app/      Splunk app with dashboards, saved searches, alerts and lookups
 scripts/             seed-splunk.js — loads demo data into Splunk via HEC
 ```
 
@@ -121,7 +121,7 @@ Seed loader      ├─►  Next API ──► Splunk HEC ──► crypto_* ind
                  │                                                  │
                  └──► /api/scan (detector) ─────────────────────────┤
                                                                     │
-                              CAM Dashboard (/app) ◄────────────────┘
+                              ZeroQ Dashboard (/app) ◄────────────────┘
                               AI Assistant + Org Plan
 ```
 
@@ -133,7 +133,7 @@ Seed loader      ├─►  Next API ──► Splunk HEC ──► crypto_* ind
 4. **Correlate / Reason** — `PlanService` asks the model to rank findings by exposure ×
    sensitivity and produce a time-boxed plan. The AI Assistant can query Splunk live.
 5. **Visualize** — Next.js dashboards read from Splunk Search API; native Splunk dashboards
-   live inside `cam-splunk-app/`.
+   live inside `zeroq-splunk-app/`.
 
 ## API routes
 

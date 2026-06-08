@@ -52,8 +52,8 @@ export default function Landing() {
       <header style={{ borderBottom: "1px solid var(--line)" }}>
         <Wrap style={{ display: "flex", alignItems: "center", height: 68, gap: 14 }}>
           <Logo size={26} />
-          <span style={{ fontWeight: 600, color: "var(--tx-hi)", fontSize: 14.5, letterSpacing: "-.01em" }}>Crypto-Agility Monitor</span>
-          <nav style={{ flex: 1, display: "flex", justifyContent: "flex-end", gap: 30, alignItems: "center" }} className="cam-landing-nav">
+          <span style={{ fontWeight: 600, color: "var(--tx-hi)", fontSize: 14.5, letterSpacing: "-.01em" }}>ZeroQ</span>
+          <nav style={{ flex: 1, display: "flex", justifyContent: "flex-end", gap: 30, alignItems: "center" }} className="zeroq-landing-nav">
             {[["#capabilities", "Capabilities"], ["#how", "How it works"], ["#platform", "Platform"]].map(([h, l]) => (
               <a key={h} href={h} style={{ color: "var(--tx-mut)", textDecoration: "none", fontSize: 13.5 }}>{l}</a>
             ))}
@@ -70,7 +70,7 @@ export default function Landing() {
             Know your quantum exposure. Close it in engineer-days.
           </h1>
           <p style={{ fontSize: 18, lineHeight: 1.6, color: "var(--tx-mut)", maxWidth: 600, marginTop: 26 }}>
-            Crypto-Agility Monitor inventories every vulnerable cipher across your code and network, then an AI agent on Splunk produces the migration plan. Built for the gap between today&apos;s encryption and tomorrow&apos;s quantum computer.
+            ZeroQ inventories every vulnerable cipher across your code and network, then an AI agent on Splunk produces the migration plan. Built for the gap between today&apos;s encryption and tomorrow&apos;s quantum computer.
           </p>
           <div style={{ display: "flex", gap: 22, marginTop: 36, alignItems: "center", flexWrap: "wrap" }}>
             <PrimaryLink href="/app">Open the dashboard</PrimaryLink>
@@ -81,7 +81,7 @@ export default function Landing() {
 
       {/* metrics strip */}
       <div style={{ borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)" }}>
-        <Wrap style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 0 }} className="cam-metrics">
+        <Wrap style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 0 }} className="zeroq-metrics">
           {[["18", "detection rules"], ["2", "source providers"], ["0–100", "unified risk score"], ["3", "compliance frameworks"]].map(([n, l], i) => (
             <div key={l} style={{ padding: "34px 0", borderLeft: i === 0 ? "none" : "1px solid var(--line)", paddingLeft: i === 0 ? 0 : 28 }}>
               <div className="mono" style={{ fontSize: 34, fontWeight: 600, color: "var(--tx-hi)", letterSpacing: "-.02em" }}>{n}</div>
@@ -93,7 +93,7 @@ export default function Landing() {
 
       {/* thesis */}
       <Wrap style={{ paddingTop: 96, paddingBottom: 96 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: 48 }} className="cam-thesis">
+        <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: 48 }} className="zeroq-thesis">
           <Eyebrow>The thesis</Eyebrow>
           <div style={{ maxWidth: 640 }}>
             <p style={{ fontSize: 24, lineHeight: 1.5, color: "var(--tx-hi)", fontWeight: 500, letterSpacing: "-.01em", margin: 0 }}>
@@ -112,7 +112,7 @@ export default function Landing() {
           <Eyebrow>Capabilities</Eyebrow>
         </Wrap>
         <Wrap style={{ paddingBottom: 80 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 0 }} className="cam-caps">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 0 }} className="zeroq-caps">
             {CAPS.map(([title, body], i) => (
               <div key={title} style={{ padding: "28px 28px 28px 0", borderTop: "1px solid var(--line)" }}>
                 <div className="mono" style={{ fontSize: 12, color: "var(--tx-dim)", marginBottom: 14 }}>{String(i + 1).padStart(2, "0")}</div>
@@ -130,7 +130,7 @@ export default function Landing() {
           <Eyebrow>How it works</Eyebrow>
           <div style={{ marginTop: 32, borderTop: "1px solid var(--line)" }}>
             {STEPS.map(([label, desc], i) => (
-              <div key={label} style={{ display: "grid", gridTemplateColumns: "60px 200px 1fr", gap: 24, alignItems: "baseline", padding: "22px 0", borderBottom: "1px solid var(--line)" }} className="cam-step-row">
+              <div key={label} style={{ display: "grid", gridTemplateColumns: "60px 200px 1fr", gap: 24, alignItems: "baseline", padding: "22px 0", borderBottom: "1px solid var(--line)" }} className="zeroq-step-row">
                 <div className="mono" style={{ fontSize: 13, color: "var(--brand-2)" }}>{String(i + 1).padStart(2, "0")}</div>
                 <div style={{ fontSize: 16, fontWeight: 600, color: "var(--tx-hi)" }}>{label}</div>
                 <div style={{ fontSize: 14, color: "var(--tx-mut)", lineHeight: 1.6 }}>{desc}</div>
@@ -143,13 +143,13 @@ export default function Landing() {
       {/* platform */}
       <div id="platform" style={{ borderTop: "1px solid var(--line)" }}>
         <Wrap style={{ paddingTop: 72, paddingBottom: 80 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: 48 }} className="cam-thesis">
+          <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: 48 }} className="zeroq-thesis">
             <Eyebrow>Platform</Eyebrow>
             <div>
               <p style={{ fontSize: 20, lineHeight: 1.5, color: "var(--tx-hi)", fontWeight: 500, margin: 0, maxWidth: 600 }}>
                 Built on Splunk. Source and findings never leave your instance.
               </p>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, marginTop: 36 }} className="cam-platform">
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, marginTop: 36 }} className="zeroq-platform">
                 {[
                   ["MCP Server", "The tool layer the agent calls to query indexes and take actions."],
                   ["Hosted model", "On-platform reasoning — nothing is sent to third parties."],
@@ -174,7 +174,7 @@ export default function Landing() {
           <p style={{ fontSize: 15.5, color: "var(--tx-mut)", maxWidth: 480, margin: "16px auto 30px", lineHeight: 1.6 }}>
             Open the dashboard and live-scan a public repository — no setup required.
           </p>
-          <div style={{ display: "flex", justifyContent: "center" }}><PrimaryLink href="/app">Open Crypto-Agility Monitor</PrimaryLink></div>
+          <div style={{ display: "flex", justifyContent: "center" }}><PrimaryLink href="/app">Open ZeroQ</PrimaryLink></div>
         </Wrap>
       </div>
 
@@ -182,7 +182,7 @@ export default function Landing() {
         <Wrap style={{ height: 72, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <Logo size={20} />
-            <span style={{ fontSize: 12.5, color: "var(--tx-dim)" }}>Crypto-Agility Monitor</span>
+            <span style={{ fontSize: 12.5, color: "var(--tx-dim)" }}>ZeroQ</span>
           </div>
           <span className="mono" style={{ fontSize: 11.5, color: "var(--tx-dim)", letterSpacing: ".08em" }}>NEXT.JS · SPLUNK · MIT</span>
         </Wrap>

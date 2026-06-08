@@ -3,11 +3,12 @@
 // ============================================================
 import { config } from "../config";
 import { AIProvider } from "./AIProvider";
-import { AnthropicProvider } from "./AnthropicProvider";
+import { DeepSeekProvider } from "./DeepSeekProvider";
 import { LocalReasoner } from "./LocalReasoner";
 import { SplunkAIProvider } from "./SplunkAIProvider";
 
 export function createAIProvider(): AIProvider {
   if (config.ai.provider === "splunk") return new SplunkAIProvider();
-  return config.ai.enabled ? new AnthropicProvider() : new LocalReasoner();
+  if (config.ai.provider === "deepseek") return new DeepSeekProvider();
+  return config.ai.enabled ? new DeepSeekProvider() : new LocalReasoner();
 }

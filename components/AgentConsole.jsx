@@ -12,7 +12,7 @@ function allLines(steps) {
   return out;
 }
 
-export default function AgentConsole({ steps, onDone, title = "Crypto-Agility Agent", subtitle, autorun = true }) {
+export default function AgentConsole({ steps, onDone, title = "ZeroQ Agent", subtitle, autorun = true }) {
   const [stepIdx, setStepIdx] = useState(autorun ? 0 : steps.length);
   const [lines, setLines] = useState(autorun ? [] : allLines(steps));
   const [done, setDone] = useState(!autorun);

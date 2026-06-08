@@ -24,7 +24,7 @@ function RealScan({ onResult }) {
     if (target) setInput(target);
     setBusy(true); setErr(null); setLast(null);
     const push = (t, text) => setLines((prev) => [...prev, { t, text }]);
-    setLines([{ t: "info", text: `$ cam scan ${tgt}` }]);
+    setLines([{ t: "info", text: `$ zeroq scan ${tgt}` }]);
     push("ai", "fetching repository tree from provider…");
     try {
       const { result, splunk } = await apiScan(tgt);
@@ -289,7 +289,7 @@ export function Agent() {
       <div className="card" style={{ padding: 18, display: "flex", alignItems: "center", gap: 14, background: "linear-gradient(110deg, #131229, #0e1320 60%)", borderColor: "var(--brand-dim)" }}>
         <div style={{ width: 40, height: 40, borderRadius: 11, background: "var(--brand-dim)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--brand-2)" }}><Icon name="ai" size={21} fill="currentColor" stroke={0} /></div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 600, color: "var(--tx-hi)", fontSize: 15 }}>Crypto-Agility Agent</div>
+          <div style={{ fontWeight: 600, color: "var(--tx-hi)", fontSize: 15 }}>ZeroQ Agent</div>
           <div style={{ fontSize: 13, color: "var(--tx-mut)", marginTop: 2 }}>An agentic loop on Splunk — ingest, detect, correlate, reason, act. Powered by Splunk MCP Server + hosted model.</div>
         </div>
         <button onClick={() => setRunning((r) => !r)} style={{ ...linkBtn, padding: "8px 14px", background: running ? "var(--safe-bg)" : "var(--bg-2)", color: running ? "var(--safe)" : "var(--tx)", borderColor: running ? "var(--safe-line)" : "var(--line)" }}>

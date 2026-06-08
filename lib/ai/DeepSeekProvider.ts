@@ -1,34 +1,36 @@
 // ============================================================
-// ai/AnthropicProvider.ts — Anthropic Messages API.
+// ai/DeepSeekProvider.ts — DeepSeek Chat Completions API.
+// Compatible with OpenAI-format: https://api.deepseek.com
 // ============================================================
 import { config } from "../config";
 import type { AICompletionRequest } from "../types";
 import { AIProvider } from "./AIProvider";
 
-export class AnthropicProvider implements AIProvider {
+export class DeepSeekProvider implements AIProvider {
   readonly live = true;
-  readonly name = "Anthropic Claude";
+  readonly name = "DeepSeek";
 
   async complete(req: AICompletionRequest): Promise<string> {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
+    const res = await fetch("https://api.deepseek.com/chat/completions", {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "x-api-key": config.ai.apiKey as string,
-        "anthropic-version": "2023-06-01",
+        authorization: `Bearer ${config.ai.apiKey as string}`,
       },
       body: JSON.stringify({
         model: config.ai.model,
         max_tokens: req.maxTokens ?? 1024,
-        system: req.system,
-        messages: req.messages.map((m) => ({ role: m.role, content: m.content })),
+        messages: [
+          ...(req.system ? [{ role: "system" as const, content: req.system }] : []),
+          ...req.messages.map((m) => ({ role: m.role, content: m.content })),
+        ],
       }),
     });
     if (!res.ok) {
       const detail = await res.text().catch(() => "");
-      throw new Error(`Anthropic ${res.status}: ${detail.slice(0, 200)}`);
+      throw new Error(`DeepSeek ${res.status}: ${detail.slice(0, 200)}`);
     }
     const data = await res.json();
-    return (data?.content?.[0]?.text ?? "").trim();
+    return (data?.choices?.[0]?.message?.content ?? "").trim();
   }
 }

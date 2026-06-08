@@ -1,5 +1,5 @@
 <dashboard version="1.1">
-  <label>CAM — Risk Dashboard</label>
+  <label>ZeroQ — Risk Dashboard</label>
   <description>Quantum risk score and exposure breakdown across code, network and PKI.</description>
   <row>
     <panel>
@@ -7,8 +7,8 @@
         <title>Quantum Risk Score</title>
         <search>
           <query>
-| index=crypto_source sourcetype=cam:crypto_finding earliest=-30d
-| append [| index=crypto_net sourcetype=cam:tls_connection earliest=-7d]
+| index=crypto_source sourcetype=zeroq:crypto_finding earliest=-30d
+| append [| index=crypto_net sourcetype=zeroq:tls_connection earliest=-7d]
 | stats count by risk, sev
 | eval weight=case(sev="critical" OR risk="critical",100,sev="high" OR risk="high",66,sev="monitor" OR risk="monitor",33,1=1,0)
 | eventstats sum(count) as total
@@ -28,9 +28,9 @@
         <title>Risk breakdown</title>
         <search>
           <query>
-| index=crypto_source sourcetype=cam:crypto_finding earliest=-30d
+| index=crypto_source sourcetype=zeroq:crypto_finding earliest=-30d
 | eval tier=sev
-| append [| index=crypto_net sourcetype=cam:tls_connection earliest=-7d | eval tier=risk]
+| append [| index=crypto_net sourcetype=zeroq:tls_connection earliest=-7d | eval tier=risk]
 | stats count by tier
 | eval tier=upper(substr(tier,1,1)).substr(tier,2)
           </query>
@@ -45,7 +45,7 @@
         <title>Critical findings (24h)</title>
         <search>
           <query>
-| index=crypto_source sourcetype=cam:crypto_finding earliest=-24h sev=critical
+| index=crypto_source sourcetype=zeroq:crypto_finding earliest=-24h sev=critical
 | stats count
           </query>
         </search>
@@ -60,7 +60,7 @@
         <title>Top repos by findings</title>
         <search>
           <query>
-| index=crypto_source sourcetype=cam:crypto_finding earliest=-30d
+| index=crypto_source sourcetype=zeroq:crypto_finding earliest=-30d
 | stats count by repo, sev
 | eventstats sum(count) as total by repo
 | sort - total

@@ -10,12 +10,13 @@ function str(key: string): string | undefined {
 
 export const config = {
   ai: {
-    apiKey: str("ANTHROPIC_API_KEY"),
-    model: str("ANTHROPIC_MODEL") ?? "claude-3-5-sonnet-20241022",
-    provider: str("AI_PROVIDER") ?? "anthropic",
+    apiKey: str("DEEPSEEK_API_KEY"),
+    model: str("DEEPSEEK_MODEL") ?? "deepseek-chat",
+    provider: str("AI_PROVIDER") ?? (str("DEEPSEEK_API_KEY") ? "deepseek" : "local"),
     get enabled() { return !!this.apiKey; },
   },
   github: {
+    org: str("GITHUB_ORG"),
     token: str("GITHUB_TOKEN"),
     api: str("GITHUB_API") ?? "https://api.github.com",
   },
@@ -30,6 +31,7 @@ export const config = {
     baseUrl: str("SPLUNK_BASE_URL"),
     username: str("SPLUNK_USERNAME"),
     password: str("SPLUNK_PASSWORD"),
+    skipTlsVerify: str("SPLUNK_SKIP_TLS_VERIFY") === "true",
     indexes: {
       net: str("SPLUNK_INDEX_NET") ?? "crypto_net",
       pki: str("SPLUNK_INDEX_PKI") ?? "crypto_pki",

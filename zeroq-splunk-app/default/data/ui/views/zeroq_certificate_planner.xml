@@ -1,12 +1,12 @@
 <dashboard version="1.1">
-  <label>CAM — Certificate Planner</label>
+  <label>ZeroQ — Certificate Planner</label>
   <description>Quantum-vulnerable certificates ranked by expiry runway.</description>
   <row>
     <panel>
       <single>
         <title>Certificates tracked</title>
         <search>
-          <query>| index=crypto_pki sourcetype=cam:cert | stats dc(subject) as count</query>
+          <query>| index=crypto_pki sourcetype=zeroq:cert | stats dc(subject) as count</query>
           <earliest>-1y</earliest>
           <latest>now</latest>
         </search>
@@ -16,7 +16,7 @@
       <single>
         <title>Expiring &lt; 30 days</title>
         <search>
-          <query>| index=crypto_pki sourcetype=cam:cert | where expiry &lt; 30 | stats count</query>
+          <query>| index=crypto_pki sourcetype=zeroq:cert | where expiry &lt; 30 | stats count</query>
         </search>
       </single>
     </panel>
@@ -24,7 +24,7 @@
       <chart>
         <title>By algorithm</title>
         <search>
-          <query>| index=crypto_pki sourcetype=cam:cert | stats count by alg</query>
+          <query>| index=crypto_pki sourcetype=zeroq:cert | stats count by alg</query>
         </search>
         <option name="charting.chart">pie</option>
       </chart>
@@ -36,7 +36,7 @@
         <title>Certificate inventory</title>
         <search>
           <query>
-| index=crypto_pki sourcetype=cam:cert
+| index=crypto_pki sourcetype=zeroq:cert
 | eval urgency=case(expiry&lt;30,"renew",expiry&lt;90,"plan",urgency="monitor","monitor",1=1,"done")
 | sort expiry
 | table subject, alg, bits, expiry, issuer, urgency

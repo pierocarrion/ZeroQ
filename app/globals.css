@@ -1,5 +1,5 @@
 /* ============================================================
-   Crypto-Agility Monitor — Design System
+   ZeroQ — Design System
    Dark enterprise SOC theme · IBM Plex · quantum-violet accent
    ============================================================ */
 
@@ -135,24 +135,24 @@ html, body {
 
 /* Sidebar nav — backgrounds via CSS so React style reconciliation
    never desyncs from imperative hover mutations. */
-.cam-nav-btn { background: transparent; }
-.cam-nav-btn:hover { background: var(--bg-2); }
-.cam-nav-btn.active { background: var(--brand-dim); box-shadow: inset 0 0 0 1px var(--brand-dim); }
-.cam-nav-btn.active:hover { background: var(--brand-dim); }
+.zeroq-nav-btn { background: transparent; }
+.zeroq-nav-btn:hover { background: var(--bg-2); }
+.zeroq-nav-btn.active { background: var(--brand-dim); box-shadow: inset 0 0 0 1px var(--brand-dim); }
+.zeroq-nav-btn.active:hover { background: var(--brand-dim); }
 
 /* ---- Landing responsive ---- */
-.cam-landing-nav a:hover { color: var(--tx-hi); }
+.zeroq-landing-nav a:hover { color: var(--tx-hi); }
 @media (max-width: 860px) {
-  .cam-landing-nav { gap: 18px !important; }
-  .cam-metrics { grid-template-columns: 1fr 1fr !important; }
-  .cam-metrics > div { border-left: none !important; padding-left: 0 !important; }
-  .cam-thesis { grid-template-columns: 1fr !important; gap: 16px !important; }
-  .cam-caps { grid-template-columns: 1fr 1fr !important; }
-  .cam-platform { grid-template-columns: 1fr !important; }
-  .cam-step-row { grid-template-columns: 40px 1fr !important; }
-  .cam-step-row > div:nth-child(3) { grid-column: 1 / -1; }
+  .zeroq-landing-nav { gap: 18px !important; }
+  .zeroq-metrics { grid-template-columns: 1fr 1fr !important; }
+  .zeroq-metrics > div { border-left: none !important; padding-left: 0 !important; }
+  .zeroq-thesis { grid-template-columns: 1fr !important; gap: 16px !important; }
+  .zeroq-caps { grid-template-columns: 1fr 1fr !important; }
+  .zeroq-platform { grid-template-columns: 1fr !important; }
+  .zeroq-step-row { grid-template-columns: 40px 1fr !important; }
+  .zeroq-step-row > div:nth-child(3) { grid-column: 1 / -1; }
 }
 @media (max-width: 560px) {
-  .cam-landing-nav { display: none !important; }
-  .cam-caps { grid-template-columns: 1fr !important; }
+  .zeroq-landing-nav { display: none !important; }
+  .zeroq-caps { grid-template-columns: 1fr !important; }
 }
