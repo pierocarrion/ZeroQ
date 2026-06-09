@@ -25,7 +25,15 @@ export class SplunkSearchClient {
 
   constructor() {
     this.enabled = config.splunk.searchEnabled;
-    this.baseUrl = (config.splunk.baseUrl || "").replace(/\/$/, "");
+    let url = (config.splunk.baseUrl || "").replace(/\/$/, "");
+    // Splunk REST API lives on port 8089 by default; auto-correct if user gave the Web UI URL.
+    try {
+      const u = new URL(url);
+      if (u.port === "" && (u.protocol === "https:" || u.protocol === "http:")) {
+        url = `${url}:8089`;
+      }
+    } catch { /* ignore malformed URLs — let runtime fetch fail naturally */ }
+    this.baseUrl = url;
     const user = config.splunk.username || "";
     const pass = config.splunk.password || "";
     this.auth = "Basic " + Buffer.from(`${user}:${pass}`).toString("base64");

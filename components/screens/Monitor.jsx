@@ -5,6 +5,7 @@ import {
   TONE, riskTone, Icon, Panel, RiskPill, Tag, Delta, Gauge, Donut, AreaChart,
   StackedBar, DataTable, StatTile, Bar, linkBtn,
 } from "../primitives";
+import { DATA } from "@/lib/data";
 
 function SourceBadge({ source }) {
   if (!source) return null;
@@ -19,7 +20,7 @@ function SourceBadge({ source }) {
 
 /* ---------------- HNDL banner ---------------- */
 function HndlBanner({ onView }) {
-  const { data: anomalies } = useSplunkData("/api/hndl");
+  const { data: anomalies, source } = useSplunkData("/api/hndl", DATA.hndlAnomalies);
   const a = anomalies && anomalies.length ? anomalies[0] : null;
   if (!a) return null;
   return (
@@ -33,6 +34,7 @@ function HndlBanner({ onView }) {
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 2 }}>
           <span style={{ fontWeight: 700, color: "var(--tx-hi)", fontSize: 14.5 }}>Harvest-Now-Decrypt-Later signal detected</span>
           <Tag tone="crit">ACTIVE</Tag>
+          {source && <SourceBadge source={source} />}
         </div>
         <div style={{ fontSize: 13, color: "var(--tx-mut)" }}>
           <span className="mono" style={{ color: "var(--tx)" }}>{a.volume}</span> of encrypted egress to first-seen destination <span className="mono" style={{ color: "var(--tx)" }}>{a.dst}</span> ({a.geo}) — <span style={{ color: "var(--crit)" }}>{a.deviation}× baseline</span>. Conventional SIEM rules don&apos;t flag this.
@@ -45,15 +47,15 @@ function HndlBanner({ onView }) {
 
 /* ---------------- Dashboard ---------------- */
 export function Dashboard({ go }) {
-  const { data: riskData, source } = useSplunkData("/api/risk");
+  const { data: riskData, source } = useSplunkData("/api/risk", DATA.summary);
   const s = riskData || { riskScore: 0, band: "—", lastMonth: 0, breakdown: [] };
   const legend = (s.breakdown || []).map((b) => ({ ...b, label: b.label || b.key, color: b.color || "var(--tx-dim)" }));
 
-  const { data: algoMix, source: algoSource } = useSplunkData("/api/algo-mix");
-  const { data: topAssets } = useSplunkData("/api/top-assets");
-  const { data: trends } = useSplunkData("/api/trends");
+  const { data: algoMix, source: algoSource } = useSplunkData("/api/algo-mix", DATA.algoMix);
+  const { data: topAssets } = useSplunkData("/api/top-assets", DATA.topAssets);
+  const { data: trends } = useSplunkData("/api/trends", { riskTrend: DATA.riskTrend, remediated: DATA.remediated });
 
-  const noData = source !== "splunk" && !riskData?.riskScore;
+  const noData = source !== "splunk" && !riskData?.riskScore && !DATA.summary.riskScore;
   return (
     <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <HndlBanner onView={() => go("hndl")} />
@@ -146,7 +148,7 @@ export function Dashboard({ go }) {
 export function Inventory() {
   const [risk, setRisk] = useState("all");
   const [q, setQ] = useState("");
-  const { data: liveRows, source } = useSplunkData("/api/inventory");
+  const { data: liveRows, source } = useSplunkData("/api/inventory", DATA.inventory);
   const all = liveRows || [];
   const rows = all.filter((r) => (risk === "all" || r.risk === risk) && (q === "" || (r.server + r.cipher + r.dst + r.src).toLowerCase().includes(q.toLowerCase())));
   const counts = { all: all.length };
@@ -211,7 +213,7 @@ const URGENCY = {
 };
 export function CertPlanner() {
   const [sort, setSort] = useState("expiry");
-  const { data: liveCerts, source } = useSplunkData("/api/certs");
+  const { data: liveCerts, source } = useSplunkData("/api/certs", DATA.certs);
   const certs = liveCerts || [];
   const rows = [...certs].sort((a, b) => (sort === "expiry" ? a.expiry - b.expiry : a.subject.localeCompare(b.subject)));
   const isPQC = (a) => a === "ML-DSA-65";
@@ -290,8 +292,8 @@ export function CertPlanner() {
 /* ---------------- HNDL detection ---------------- */
 export function HndlDetect() {
   const [sel, setSel] = useState(0);
-  const { data: anomalies, source } = useSplunkData("/api/hndl");
-  const { data: timeline } = useSplunkData("/api/hndl/timeline");
+  const { data: anomalies, source } = useSplunkData("/api/hndl", DATA.hndlAnomalies);
+  const { data: timeline } = useSplunkData("/api/hndl/timeline", DATA.hndlTimeline);
   const list = anomalies || [];
   const a = list[sel] || list[0];
   const statusTone = (s) => (s === "active" ? "crit" : "warn");

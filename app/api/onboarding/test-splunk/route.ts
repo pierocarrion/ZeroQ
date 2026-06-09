@@ -8,6 +8,24 @@ function normalize(url?: string) {
   return (url || "").replace(/\/$/, "");
 }
 
+function hasExplicitPort(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.port !== "";
+  } catch {
+    return false;
+  }
+}
+
+function candidateUrls(url: string): string[] {
+  const normalized = normalize(url);
+  const candidates = [normalized];
+  if (!hasExplicitPort(normalized)) {
+    candidates.push(`${normalized}:8089`);
+  }
+  return candidates;
+}
+
 function networkError(e: any): string {
   const msg = e?.message || String(e);
   if (msg.includes("ECONNREFUSED")) return "Connection refused — check the URL/port";
@@ -73,40 +91,25 @@ export async function POST(req: NextRequest) {
   }
 
   // Test REST Search
+  let suggestedBaseUrl: string | undefined;
   if (body.baseUrl && body.username && body.password) {
-    const baseUrl = normalize(body.baseUrl);
     let restOk = false;
     let restErr = "";
 
-    // 1) Try POST /services/auth/login (always present in Splunk)
-    try {
-      const loginBody = new URLSearchParams({ username: body.username, password: body.password });
-      const res = await splunkFetch(`${baseUrl}/services/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: loginBody.toString(),
-      }, body.skipTlsVerify);
-      if (res.ok) {
-        restOk = true;
-      } else {
-        const text = await res.text().catch(() => "");
-        restErr = `REST ${res.status}: ${text.slice(0, 120)}`;
-      }
-    } catch (e: any) {
-      restErr = networkError(e);
-    }
+    for (const candidate of candidateUrls(body.baseUrl)) {
+      if (restOk) break;
 
-    // 2) Fallback to GET /services/server/info if login wasn't tried or gave 404
-    if (!restOk && restErr.includes("404")) {
+      // 1) Try POST /services/auth/login (always present in Splunk)
       try {
-        const res = await splunkFetch(`${baseUrl}/services/server/info`, {
-          headers: {
-            Authorization: "Basic " + Buffer.from(`${body.username}:${body.password}`).toString("base64"),
-          },
+        const loginBody = new URLSearchParams({ username: body.username, password: body.password });
+        const res = await splunkFetch(`${candidate}/services/auth/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: loginBody.toString(),
         }, body.skipTlsVerify);
         if (res.ok) {
           restOk = true;
-          restErr = "";
+          if (candidate !== normalize(body.baseUrl)) suggestedBaseUrl = candidate;
         } else {
           const text = await res.text().catch(() => "");
           restErr = `REST ${res.status}: ${text.slice(0, 120)}`;
@@ -114,9 +117,34 @@ export async function POST(req: NextRequest) {
       } catch (e: any) {
         restErr = networkError(e);
       }
+
+      // 2) Fallback to GET /services/server/info if login wasn't tried or gave 404
+      if (!restOk && restErr.includes("404")) {
+        try {
+          const res = await splunkFetch(`${candidate}/services/server/info`, {
+            headers: {
+              Authorization: "Basic " + Buffer.from(`${body.username}:${body.password}`).toString("base64"),
+            },
+          }, body.skipTlsVerify);
+          if (res.ok) {
+            restOk = true;
+            restErr = "";
+            if (candidate !== normalize(body.baseUrl)) suggestedBaseUrl = candidate;
+          } else {
+            const text = await res.text().catch(() => "");
+            restErr = `REST ${res.status}: ${text.slice(0, 120)}`;
+          }
+        } catch (e: any) {
+          restErr = networkError(e);
+        }
+      }
     }
 
-    checks.rest = restOk ? { ok: true } : { ok: false, error: restErr || "REST test failed" };
+    if (!restOk && restErr.includes("404")) {
+      restErr = "REST 404 — Splunk REST API not found. Try adding :8089 to your Base URL (e.g. https://tenant.splunkcloud.com:8089).";
+    }
+
+    checks.rest = restOk ? { ok: true, suggestedBaseUrl } : { ok: false, error: restErr || "REST test failed" };
   }
 
   const allOk = Object.values(checks).every((c: any) => c.ok);

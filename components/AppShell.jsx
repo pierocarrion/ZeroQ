@@ -170,8 +170,18 @@ export default function AppShell() {
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 0; }, [active]);
   useEffect(() => {
     let mounted = true;
-    apiRisk().then((d) => { if (mounted) setSplunkLive(!!d?.capabilities?.splunk); }).catch(() => { if (mounted) setSplunkLive(false); });
-    return () => { mounted = false; };
+    async function checkHealth() {
+      try {
+        const res = await fetch("/api/health/splunk", { cache: "no-store" });
+        const d = await res.json();
+        if (mounted) setSplunkLive(!!d?.connected);
+      } catch {
+        if (mounted) setSplunkLive(false);
+      }
+    }
+    checkHealth();
+    const interval = setInterval(checkHealth, 30_000);
+    return () => { mounted = false; clearInterval(interval); };
   }, []);
   const fullHeight = active === "assistant";
 

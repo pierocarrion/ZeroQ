@@ -5,6 +5,7 @@ import {
 } from "../primitives";
 import AgentConsole from "../AgentConsole";
 import { apiScan, useScannedRepos, repoStore, useSplunkData } from "../client";
+import { DATA } from "@/lib/data";
 
 /* ---------------- Real live scanner ---------------- */
 function RealScan({ onResult }) {
@@ -97,9 +98,9 @@ function RealScan({ onResult }) {
 
 /* ---------------- Repository Scanner ---------------- */
 export function Repos({ go }) {
-  const { data: codeRollup } = useSplunkData("/api/code-rollup");
-  const { data: orgs } = useSplunkData("/api/orgs");
-  const { data: liveRepos } = useSplunkData("/api/repos");
+  const { data: codeRollup } = useSplunkData("/api/code-rollup", DATA.codeRollup);
+  const { data: orgs } = useSplunkData("/api/orgs", DATA.orgs);
+  const { data: liveRepos } = useSplunkData("/api/repos", DATA.repos);
   const r = codeRollup || { reposTotal: 0, reposScanned: 0, filesScanned: 0, findings: 0, critical: 0, fixablePR: 0 };
   const real = useScannedRepos();
   const seedRepos = liveRepos || [];

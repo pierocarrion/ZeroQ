@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { TONE, Icon, Panel, Tag, GradeBadge, linkBtn } from "../primitives";
+import { TONE, Icon, Panel, Tag, GradeBadge, Spinner, linkBtn } from "../primitives";
+import { DATA } from "@/lib/data";
 import AgentConsole from "../AgentConsole";
 import { apiPlan, useScannedRepos, useSplunkData } from "../client";
 
@@ -10,8 +11,8 @@ export function OrgPlan({ go }) {
   const [ready, setReady] = useState(false);
   const [plan, setPlan] = useState({ org: "—", generated: "—", summary: "", posture: "—", targetPosture: "A", weeks: 0, streams: [] });
   const [mode, setMode] = useState(null);
-  const { data: orgPlan } = useSplunkData("/api/org-plan");
-  const { data: rollup } = useSplunkData("/api/code-rollup");
+  const { data: orgPlan } = useSplunkData("/api/org-plan", DATA.orgPlan);
+  const { data: rollup } = useSplunkData("/api/code-rollup", DATA.codeRollup);
   const basePlan = orgPlan;
   const r = rollup || {};
 
@@ -219,8 +220,54 @@ components/             # React UI`}
 export function Settings() {
   const [testing, setTesting] = useState({});
   const [config, setConfig] = useState({
-    githubOrg: "", splunkHecUrl: "", splunkHecToken: "", splunkBaseUrl: "", splunkUsername: "", splunkPassword: "", deepseekApiKey: "",
+    githubOrg: "", selectedRepos: [], splunkHecUrl: "", splunkHecToken: "", splunkBaseUrl: "", splunkUsername: "", splunkPassword: "", splunkSkipTlsVerify: "", deepseekApiKey: "",
   });
+
+  const [repos, setRepos] = useState([]);
+  const [reposLoading, setReposLoading] = useState(false);
+  const [selected, setSelected] = useState(new Set());
+  const [savingRepos, setSavingRepos] = useState(false);
+  const [scanningRepos, setScanningRepos] = useState(false);
+  const [scanSummary, setScanSummary] = useState(null);
+
+  useEffect(() => {
+    fetch("/api/onboarding/config")
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.ok) return;
+        setConfig((c) => ({
+          ...c,
+          githubOrg: data.githubOrg || c.githubOrg,
+          selectedRepos: Array.isArray(data.selectedRepos) ? data.selectedRepos : c.selectedRepos,
+          splunkHecUrl: data.splunkHecUrl || c.splunkHecUrl,
+          splunkHecToken: data.splunkHecToken || c.splunkHecToken,
+          splunkBaseUrl: data.splunkBaseUrl || c.splunkBaseUrl,
+          splunkUsername: data.splunkUsername || c.splunkUsername,
+          splunkPassword: data.splunkPassword || c.splunkPassword,
+          splunkSkipTlsVerify: data.splunkSkipTlsVerify || c.splunkSkipTlsVerify,
+          deepseekApiKey: data.deepseekApiKey || c.deepseekApiKey,
+        }));
+        if (Array.isArray(data.selectedRepos)) setSelected(new Set(data.selectedRepos));
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!config.githubOrg) { setRepos([]); return; }
+    let mounted = true;
+    async function load() {
+      setReposLoading(true); setScanSummary(null);
+      try {
+        const res = await fetch(`/api/github/repos?org=${encodeURIComponent(config.githubOrg)}`);
+        const data = await res.json();
+        if (!mounted) return;
+        setRepos(data.data || []);
+      } catch { if (mounted) setRepos([]); }
+      finally { if (mounted) setReposLoading(false); }
+    }
+    load();
+    return () => { mounted = false; };
+  }, [config.githubOrg]);
 
   async function testGitHub() {
     setTesting((t) => ({ ...t, github: true }));
@@ -240,7 +287,7 @@ export function Settings() {
     try {
       const res = await fetch("/api/onboarding/test-splunk", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ hecUrl: config.splunkHecUrl, hecToken: config.splunkHecToken, baseUrl: config.splunkBaseUrl, username: config.splunkUsername, password: config.splunkPassword }),
+        body: JSON.stringify({ hecUrl: config.splunkHecUrl, hecToken: config.splunkHecToken, baseUrl: config.splunkBaseUrl, username: config.splunkUsername, password: config.splunkPassword, skipTlsVerify: config.splunkSkipTlsVerify === "true" }),
       });
       const data = await res.json();
       setTesting((t) => ({ ...t, splunk: data.ok ? "ok" : "error", splunkMsg: data.ok ? "Connected" : (data.checks?.hec?.error || data.checks?.rest?.error || "Failed") }));
@@ -261,6 +308,7 @@ export function Settings() {
           splunkBaseUrl: config.splunkBaseUrl,
           splunkUsername: config.splunkUsername,
           splunkPassword: config.splunkPassword,
+          splunkSkipTlsVerify: config.splunkSkipTlsVerify,
           deepseekApiKey: config.deepseekApiKey,
         }),
       });
@@ -269,6 +317,45 @@ export function Settings() {
     } catch (e) {
       setTesting((t) => ({ ...t, saving: false, saved: false, savedMsg: e?.message }));
     }
+  }
+
+  const toggleRepo = (name) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name); else next.add(name);
+      return next;
+    });
+  };
+
+  async function saveRepoSelection() {
+    setSavingRepos(true);
+    try {
+      const res = await fetch("/api/onboarding/config", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ selectedRepos: Array.from(selected) }),
+      });
+      const data = await res.json();
+      setTesting((t) => ({ ...t, reposSaved: data.ok, reposSavedMsg: data.message || data.error }));
+      if (data.ok) setConfig((c) => ({ ...c, selectedRepos: Array.from(selected) }));
+    } catch (e) {
+      setTesting((t) => ({ ...t, reposSaved: false, reposSavedMsg: e?.message }));
+    } finally { setSavingRepos(false); }
+  }
+
+  async function runSelectedScan() {
+    const targets = Array.from(selected);
+    if (targets.length === 0) return;
+    setScanningRepos(true); setScanSummary(null);
+    try {
+      const res = await fetch("/api/scan-batch", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ repos: targets }),
+      });
+      const data = await res.json();
+      setScanSummary(data);
+    } catch (e) {
+      setScanSummary({ error: e?.message || "Batch scan failed" });
+    } finally { setScanningRepos(false); }
   }
 
   const inputStyle = {
@@ -321,6 +408,10 @@ export function Settings() {
               <input value={config.splunkUsername} onChange={(e) => setConfig((c) => ({ ...c, splunkUsername: e.target.value }))} placeholder="Username" style={inputStyle} />
               <input type="password" value={config.splunkPassword} onChange={(e) => setConfig((c) => ({ ...c, splunkPassword: e.target.value }))} placeholder="Password" style={inputStyle} />
             </div>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: "var(--tx-mut)", cursor: "pointer" }}>
+              <input type="checkbox" checked={config.splunkSkipTlsVerify === "true"} onChange={(e) => setConfig((c) => ({ ...c, splunkSkipTlsVerify: e.target.checked ? "true" : "" }))} style={{ accentColor: "var(--brand)" }} />
+              Skip TLS certificate verification (local dev only)
+            </label>
             <button onClick={testSplunk} disabled={testing.splunk === true} style={{ ...linkBtn, padding: "8px 14px", alignSelf: "flex-start" }}>{testing.splunk === true ? <Spinner size={14} /> : "Test Splunk connections"}</button>
           </div>
 
@@ -338,6 +429,61 @@ export function Settings() {
             {testing.saved === false && <Tag tone="crit">{testing.savedMsg}</Tag>}
           </div>
         </div>
+      </div>
+
+      <div className="card" style={{ padding: 22 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
+          <span style={{ color: "var(--brand-2)" }}><Icon name="inventory" size={20} /></span>
+          <span style={{ fontWeight: 600, color: "var(--tx-hi)", fontSize: 15 }}>Selected repositories</span>
+          {Array.isArray(config.selectedRepos) && config.selectedRepos.length > 0 && (
+            <Tag tone="brand">{config.selectedRepos.length} saved</Tag>
+          )}
+        </div>
+
+        {!config.githubOrg ? (
+          <div style={{ fontSize: 13, color: "var(--tx-mut)" }}>
+            Set a GitHub organization above to manage selected repositories.
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {reposLoading && <div style={{ color: "var(--tx-mut)", fontSize: 13 }}><Spinner size={14} /> Loading repositories…</div>}
+            {!reposLoading && repos.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 320, overflowY: "auto", border: "1px solid var(--line)", borderRadius: 10, padding: 8 }}>
+                {repos.map((r) => (
+                  <label key={r.fullName} style={{
+                    display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, cursor: "pointer",
+                    background: selected.has(r.fullName) ? "var(--brand-dim)" : "transparent",
+                  }}>
+                    <input type="checkbox" checked={selected.has(r.fullName)} onChange={() => toggleRepo(r.fullName)} style={{ accentColor: "var(--brand)" }} />
+                    <span style={{ fontFamily: "var(--mono)", fontSize: 13, color: "var(--tx-hi)", flex: 1 }}>{r.fullName}</span>
+                    {r.language && <Tag tone="brand" mono>{r.language}</Tag>}
+                  </label>
+                ))}
+              </div>
+            )}
+            {!reposLoading && repos.length === 0 && (
+              <div style={{ fontSize: 13, color: "var(--tx-mut)" }}>No repositories found for <strong>{config.githubOrg}</strong>.</div>
+            )}
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <button onClick={saveRepoSelection} disabled={savingRepos || scanningRepos} style={{ ...linkBtn, padding: "10px 18px", background: "var(--brand)", color: "#fff", borderColor: "var(--brand)", fontWeight: 600, fontSize: 14 }}>
+                {savingRepos ? <Spinner size={14} /> : <Icon name="check" size={14} />} Save selection
+              </button>
+              <button onClick={runSelectedScan} disabled={scanningRepos || selected.size === 0} style={{ ...linkBtn, padding: "10px 18px" }}>
+                {scanningRepos ? <Spinner size={14} /> : <Icon name="zap" size={14} />} Scan {selected.size} repo{selected.size !== 1 ? "s" : ""}
+              </button>
+              {testing.reposSaved === true && <Tag tone="safe">{testing.reposSavedMsg}</Tag>}
+              {testing.reposSaved === false && <Tag tone="crit">{testing.reposSavedMsg}</Tag>}
+            </div>
+            {scanSummary && !scanSummary.error && (
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <Tag tone="safe">{scanSummary.summary?.success ?? 0} scanned</Tag>
+                <Tag tone={(scanSummary.summary?.critical ?? 0) > 0 ? "crit" : "safe"}>{scanSummary.summary?.critical ?? 0} critical</Tag>
+                <Tag tone={(scanSummary.summary?.findings ?? 0) > 0 ? "high" : "safe"}>{scanSummary.summary?.findings ?? 0} findings</Tag>
+              </div>
+            )}
+            {scanSummary?.error && <Tag tone="crit">{scanSummary.error}</Tag>}
+          </div>
+        )}
       </div>
 
       <div className="card" style={{ padding: 18 }}>

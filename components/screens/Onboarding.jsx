@@ -196,7 +196,7 @@ function SplunkStep({ config, setConfig, onNext }) {
           <Icon name="search" size={14} /> REST Search API (read)
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <Input label="Base URL" value={config.splunkBaseUrl} onChange={(v) => setConfig((c) => ({ ...c, splunkBaseUrl: v }))} placeholder="https://tenant.splunkcloud.com" />
+          <Input label="Base URL" value={config.splunkBaseUrl} onChange={(v) => setConfig((c) => ({ ...c, splunkBaseUrl: v }))} placeholder="https://tenant.splunkcloud.com:8089" />
           <Input label="Username" value={config.splunkUsername} onChange={(v) => setConfig((c) => ({ ...c, splunkUsername: v }))} placeholder="zeroq_api" />
           <Input label="Password" type="password" value={config.splunkPassword} onChange={(v) => setConfig((c) => ({ ...c, splunkPassword: v }))} placeholder="" />
         </div>
@@ -240,6 +240,7 @@ function ScanStep({ config, onNext }) {
   const [selected, setSelected] = useState(new Set());
   const [scanning, setScanning] = useState(false);
   const [scanResult, setScanResult] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!config.githubOrg) return;
@@ -250,12 +251,19 @@ function ScanStep({ config, onNext }) {
         const data = await res.json();
         const list = data.data || [];
         setRepos(list);
-        if (list.length <= 10) setSelected(new Set(list.map((r) => r.fullName)));
+        const persisted = new Set(config.selectedRepos || []);
+        if (persisted.size > 0) {
+          setSelected(persisted);
+        } else if (list.length <= 10) {
+          setSelected(new Set(list.map((r) => r.fullName)));
+        } else {
+          setSelected(new Set());
+        }
       } catch { setRepos([]); }
       finally { setLoading(false); }
     }
     load();
-  }, [config.githubOrg]);
+  }, [config.githubOrg, config.selectedRepos]);
 
   async function runScan() {
     const targets = Array.from(selected);
@@ -273,6 +281,19 @@ function ScanStep({ config, onNext }) {
     } finally { setScanning(false); }
   }
 
+  async function saveSelection(andContinue = false) {
+    setSaving(true);
+    try {
+      await fetch("/api/onboarding/config", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ selectedRepos: Array.from(selected) }),
+      });
+      if (andContinue) onNext();
+    } catch { /* ignore */ }
+    finally { setSaving(false); }
+  }
+
   const toggle = (name) => {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -280,6 +301,9 @@ function ScanStep({ config, onNext }) {
       return next;
     });
   };
+
+  const canScan = selected.size > 0 && !scanning && !saving;
+  const skipLabel = selected.size === 0 ? "Skip for now" : "Save selection & continue";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
@@ -305,11 +329,13 @@ function ScanStep({ config, onNext }) {
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-        <button onClick={runScan} disabled={scanning || selected.size === 0} style={{ ...linkBtn, padding: "10px 18px", background: "var(--brand)", color: "#fff", borderColor: "var(--brand)", fontWeight: 600, fontSize: 14 }}>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <button onClick={runScan} disabled={!canScan} style={{ ...linkBtn, padding: "10px 18px", background: canScan ? "var(--brand)" : "var(--bg-2)", color: canScan ? "#fff" : "var(--tx-mut)", borderColor: canScan ? "var(--brand)" : "var(--line)", fontWeight: 600, fontSize: 14 }}>
           {scanning ? <Spinner size={14} /> : <Icon name="zap" size={14} />} Scan {selected.size} repo{selected.size !== 1 ? "s" : ""}
         </button>
-        <button onClick={onNext} style={{ ...linkBtn, padding: "10px 18px" }}>Skip for now</button>
+        <button onClick={() => saveSelection(true)} disabled={saving || scanning} style={{ ...linkBtn, padding: "10px 18px" }}>
+          {saving ? <Spinner size={14} /> : <Icon name="check" size={14} />} {skipLabel}
+        </button>
       </div>
 
       {scanResult && !scanResult.error && (
@@ -406,6 +432,7 @@ export default function Onboarding() {
   const [step, setStep] = useState(0);
   const [config, setConfig] = useState({
     githubOrg: "",
+    selectedRepos: [],
     splunkHecUrl: "",
     splunkHecToken: "",
     splunkBaseUrl: "",
@@ -424,6 +451,7 @@ export default function Onboarding() {
           setConfig((c) => ({
             ...c,
             githubOrg: data.githubOrg || c.githubOrg,
+            selectedRepos: Array.isArray(data.selectedRepos) ? data.selectedRepos : c.selectedRepos,
             splunkHecUrl: data.splunkHecUrl || c.splunkHecUrl,
             splunkHecToken: data.splunkHecToken || c.splunkHecToken,
             splunkBaseUrl: data.splunkBaseUrl || c.splunkBaseUrl,
