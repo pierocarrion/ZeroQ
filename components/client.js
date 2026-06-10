@@ -80,23 +80,23 @@ export async function apiSplunkQuery(query) {
   return res.json();
 }
 
-// ---- Hook: fetch from a Splunk-backed endpoint with seed fallback ----
-export function useSplunkData(endpoint, fallback, deps = []) {
-  const [state, setState] = useState({ data: fallback, source: "seed", loading: true, error: null });
+// ---- Hook: fetch from a Splunk-backed endpoint (no seed fallback) ----
+export function useSplunkData(endpoint, deps = []) {
+  const [state, setState] = useState({ data: null, source: null, loading: true, error: null });
   useEffect(() => {
     let mounted = true;
     async function load() {
       try {
         const json = await apiGet(endpoint);
         if (!mounted) return;
-        if (json.data) {
+        if (json.data != null) {
           setState({ data: json.data, source: json.source || "unknown", loading: false, error: json.error || null });
         } else {
-          setState({ data: fallback, source: "seed", loading: false, error: json.error || "Invalid response" });
+          setState({ data: null, source: null, loading: false, error: json.error || "No data" });
         }
       } catch (e) {
         if (!mounted) return;
-        setState({ data: fallback, source: "seed", loading: false, error: e?.message });
+        setState({ data: null, source: null, loading: false, error: e?.message });
       }
     }
     load();

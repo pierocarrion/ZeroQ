@@ -5,7 +5,6 @@ import {
   TONE, riskTone, Icon, Panel, RiskPill, Tag, Delta, Gauge, Donut, AreaChart,
   StackedBar, DataTable, StatTile, Bar, linkBtn,
 } from "../primitives";
-import { DATA } from "@/lib/data";
 
 function SourceBadge({ source }) {
   if (!source) return null;
@@ -20,7 +19,7 @@ function SourceBadge({ source }) {
 
 /* ---------------- HNDL banner ---------------- */
 function HndlBanner({ onView }) {
-  const { data: anomalies, source } = useSplunkData("/api/hndl", DATA.hndlAnomalies);
+  const { data: anomalies, source } = useSplunkData("/api/hndl");
   const a = anomalies && anomalies.length ? anomalies[0] : null;
   if (!a) return null;
   return (
@@ -47,15 +46,15 @@ function HndlBanner({ onView }) {
 
 /* ---------------- Dashboard ---------------- */
 export function Dashboard({ go }) {
-  const { data: riskData, source } = useSplunkData("/api/risk", DATA.summary);
+  const { data: riskData, source } = useSplunkData("/api/risk");
   const s = riskData || { riskScore: 0, band: "—", lastMonth: 0, breakdown: [] };
   const legend = (s.breakdown || []).map((b) => ({ ...b, label: b.label || b.key, color: b.color || "var(--tx-dim)" }));
 
-  const { data: algoMix, source: algoSource } = useSplunkData("/api/algo-mix", DATA.algoMix);
-  const { data: topAssets } = useSplunkData("/api/top-assets", DATA.topAssets);
-  const { data: trends } = useSplunkData("/api/trends", { riskTrend: DATA.riskTrend, remediated: DATA.remediated });
+  const { data: algoMix, source: algoSource } = useSplunkData("/api/algo-mix");
+  const { data: topAssets } = useSplunkData("/api/top-assets");
+  const { data: trends } = useSplunkData("/api/trends");
 
-  const noData = source !== "splunk" && !riskData?.riskScore && !DATA.summary.riskScore;
+  const noData = source !== "splunk" && !riskData?.riskScore;
   return (
     <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <HndlBanner onView={() => go("hndl")} />
@@ -148,7 +147,19 @@ export function Dashboard({ go }) {
 export function Inventory() {
   const [risk, setRisk] = useState("all");
   const [q, setQ] = useState("");
-  const { data: liveRows, source } = useSplunkData("/api/inventory", DATA.inventory);
+  const { data: liveRows, source } = useSplunkData("/api/inventory");
+  if (liveRows === null) return (
+    <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div className="card" style={{ padding: 40, textAlign: "center" }}>
+        <div style={{ color: "var(--safe)", display: "flex", justifyContent: "center", marginBottom: 10 }}><Icon name="globe" size={32} /></div>
+        <div style={{ fontSize: 15, fontWeight: 600, color: "var(--tx-hi)", marginBottom: 6 }}>No network inventory available</div>
+        <div style={{ fontSize: 13.5, color: "var(--tx-mut)", maxWidth: 420, margin: "0 auto 16px", lineHeight: 1.5 }}>
+          TLS connection profiles are built from Zeek ssl.log data indexed in Splunk. Connect your instance to start monitoring.
+        </div>
+        <a href="/onboarding" style={{ ...linkBtn, padding: "9px 15px", background: "var(--brand)", color: "#fff", borderColor: "var(--brand)", textDecoration: "none", display: "inline-flex" }}>Connect Splunk</a>
+      </div>
+    </div>
+  );
   const all = liveRows || [];
   const rows = all.filter((r) => (risk === "all" || r.risk === risk) && (q === "" || (r.server + r.cipher + r.dst + r.src).toLowerCase().includes(q.toLowerCase())));
   const counts = { all: all.length };
@@ -213,7 +224,19 @@ const URGENCY = {
 };
 export function CertPlanner() {
   const [sort, setSort] = useState("expiry");
-  const { data: liveCerts, source } = useSplunkData("/api/certs", DATA.certs);
+  const { data: liveCerts, source } = useSplunkData("/api/certs");
+  if (liveCerts === null) return (
+    <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div className="card" style={{ padding: 40, textAlign: "center" }}>
+        <div style={{ color: "var(--safe)", display: "flex", justifyContent: "center", marginBottom: 10 }}><Icon name="cert" size={32} /></div>
+        <div style={{ fontSize: 15, fontWeight: 600, color: "var(--tx-hi)", marginBottom: 6 }}>No certificate data available</div>
+        <div style={{ fontSize: 13.5, color: "var(--tx-mut)", maxWidth: 420, margin: "0 auto 16px", lineHeight: 1.5 }}>
+          Certificate posture is built from PKI metadata indexed in Splunk. Connect your instance to start tracking expiry and algorithm risk.
+        </div>
+        <a href="/onboarding" style={{ ...linkBtn, padding: "9px 15px", background: "var(--brand)", color: "#fff", borderColor: "var(--brand)", textDecoration: "none", display: "inline-flex" }}>Connect Splunk</a>
+      </div>
+    </div>
+  );
   const certs = liveCerts || [];
   const rows = [...certs].sort((a, b) => (sort === "expiry" ? a.expiry - b.expiry : a.subject.localeCompare(b.subject)));
   const isPQC = (a) => a === "ML-DSA-65";
@@ -292,8 +315,8 @@ export function CertPlanner() {
 /* ---------------- HNDL detection ---------------- */
 export function HndlDetect() {
   const [sel, setSel] = useState(0);
-  const { data: anomalies, source } = useSplunkData("/api/hndl", DATA.hndlAnomalies);
-  const { data: timeline } = useSplunkData("/api/hndl/timeline", DATA.hndlTimeline);
+  const { data: anomalies, source } = useSplunkData("/api/hndl");
+  const { data: timeline } = useSplunkData("/api/hndl/timeline");
   const list = anomalies || [];
   const a = list[sel] || list[0];
   const statusTone = (s) => (s === "active" ? "crit" : "warn");

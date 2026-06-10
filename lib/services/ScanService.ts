@@ -3,7 +3,7 @@
 // parse → provider (I/O) → detect → score. Depends on the
 // SourceProvider + SplunkClient abstractions, not concretions.
 // ============================================================
-import { parseTarget } from "../scanning/target";
+import { parseTarget, TargetParseError } from "../scanning/target";
 import { detect } from "../scanning/detector";
 import { buildScanResult } from "../scanning/scoring";
 import { createSourceProvider } from "../providers/sourceProviderFactory";
@@ -19,9 +19,6 @@ export class ScanService {
 
   async scan(rawTarget: string): Promise<{ result: ScanResult; splunk: IngestResult | null }> {
     const target = parseTarget(rawTarget);
-    if (!target) {
-      throw new Error("Enter owner/repo (GitHub), group/project (GitLab), or a full URL.");
-    }
     const provider = this.providerFactory(target.provider);
     const { meta, files, totalScannable } = await provider.loadRepository(target, this.maxFiles);
     const findings = files.flatMap((f) => detect(meta.fullName, f.path, f.content));

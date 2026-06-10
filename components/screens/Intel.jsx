@@ -1,8 +1,7 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
-import { TONE, riskTone, Icon, Panel, Tag, Bar, MdLite } from "../primitives";
+import { TONE, riskTone, Icon, Panel, Tag, Bar, MdLite, linkBtn } from "../primitives";
 import { apiAssistant, apiSplunkQuery, useScannedRepos, useSplunkData } from "../client";
-import { DATA } from "@/lib/data";
 
 function AiAvatar() {
   return (
@@ -145,7 +144,7 @@ export function Assistant() {
 
 /* ---------------- Roadmap ---------------- */
 export function Roadmap() {
-  const { data: roadmap, source } = useSplunkData("/api/roadmap", DATA.roadmap);
+  const { data: roadmap, source } = useSplunkData("/api/roadmap");
   const phases = roadmap || [];
   if (phases.length === 0) return (
     <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -212,8 +211,8 @@ export function Roadmap() {
 /* ---------------- Compliance ---------------- */
 export function Compliance() {
   const stateTone = { past: "safe", active: "brand", target: "high" };
-  const { data: liveStats, source } = useSplunkData("/api/compliance", DATA.compliance);
-  const { data: rollup } = useSplunkData("/api/code-rollup", DATA.codeRollup);
+  const { data: liveStats, source } = useSplunkData("/api/compliance");
+  const { data: rollup } = useSplunkData("/api/code-rollup");
   const frameworks = liveStats || [];
   const r = rollup || {};
   if (frameworks.length === 0) return (

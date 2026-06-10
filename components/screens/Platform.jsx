@@ -1,7 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { TONE, Icon, Panel, Tag, GradeBadge, Spinner, linkBtn } from "../primitives";
-import { DATA } from "@/lib/data";
 import AgentConsole from "../AgentConsole";
 import { apiPlan, useScannedRepos, useSplunkData } from "../client";
 
@@ -11,8 +10,8 @@ export function OrgPlan({ go }) {
   const [ready, setReady] = useState(false);
   const [plan, setPlan] = useState({ org: "—", generated: "—", summary: "", posture: "—", targetPosture: "A", weeks: 0, streams: [] });
   const [mode, setMode] = useState(null);
-  const { data: orgPlan } = useSplunkData("/api/org-plan", DATA.orgPlan);
-  const { data: rollup } = useSplunkData("/api/code-rollup", DATA.codeRollup);
+  const { data: orgPlan } = useSplunkData("/api/org-plan");
+  const { data: rollup } = useSplunkData("/api/code-rollup");
   const basePlan = orgPlan;
   const r = rollup || {};
 

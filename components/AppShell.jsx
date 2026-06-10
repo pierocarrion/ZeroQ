@@ -38,7 +38,7 @@ const TITLES = {
   dashboard: ["Quantum Risk Dashboard", "Real-time ZeroQ posture across the network"],
   inventory: ["Crypto Inventory", "Every cipher suite & TLS profile observed on the wire"],
   certs: ["Certificate Migration Planner", "Quantum-vulnerable certificates ranked by expiry"],
-  repos: ["Repository Scanner", "Live-scan any public GitHub or GitLab repo for crypto-in-code"],
+  repos: ["Repository Scanner", "Live-scan any public GitHub repo for crypto-in-code"],
   agent: ["AI Agent", "The agentic loop running on Splunk — ingest, detect, correlate, reason, act"],
   plan: ["Org Security Plan", "AI-generated, prioritized remediation across your whole organization"],
   hndl: ["Harvest-Now-Decrypt-Later Detection", "Anomalous encrypted egress that conventional SIEM misses"],

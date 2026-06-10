@@ -5,7 +5,6 @@ import {
 } from "../primitives";
 import AgentConsole from "../AgentConsole";
 import { apiScan, useScannedRepos, repoStore, useSplunkData } from "../client";
-import { DATA } from "@/lib/data";
 
 /* ---------------- Real live scanner ---------------- */
 function RealScan({ onResult }) {
@@ -50,7 +49,7 @@ function RealScan({ onResult }) {
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 14.5, fontWeight: 600, color: "var(--tx-hi)" }}>Scan a real repository</div>
-          <div style={{ fontSize: 12.5, color: "var(--tx-mut)" }}>Live scan of any public GitHub or GitLab repo — fetched &amp; analyzed server-side</div>
+          <div style={{ fontSize: 12.5, color: "var(--tx-mut)" }}>Live scan of any public GitHub repo — fetched &amp; analyzed server-side</div>
         </div>
         <Tag tone="safe">engine live</Tag>
       </div>
@@ -59,7 +58,7 @@ function RealScan({ onResult }) {
           <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "0 14px", height: 42, flex: 1, minWidth: 240, background: "var(--bg-inset)", border: "1px solid var(--line)", borderRadius: 10 }}>
             <span style={{ color: "var(--tx-dim)", display: "flex" }}><Icon name="globe" size={16} /></span>
             <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") run(); }}
-              placeholder="owner/repo  ·  group/project  ·  or full GitHub/GitLab URL"
+              placeholder="owner/repo  ·  or full github.com URL"
               style={{ flex: 1, background: "none", border: "none", outline: "none", color: "var(--tx)", fontFamily: "var(--mono)", fontSize: 13 }} />
           </div>
           <button onClick={() => run()} disabled={busy} style={{ ...linkBtn, padding: "0 18px", height: 42, background: busy ? "var(--bg-2)" : "var(--brand)", color: busy ? "var(--tx-mut)" : "#fff", borderColor: busy ? "var(--line)" : "var(--brand)", cursor: busy ? "default" : "pointer", fontWeight: 600 }}>
@@ -98,9 +97,9 @@ function RealScan({ onResult }) {
 
 /* ---------------- Repository Scanner ---------------- */
 export function Repos({ go }) {
-  const { data: codeRollup } = useSplunkData("/api/code-rollup", DATA.codeRollup);
-  const { data: orgs } = useSplunkData("/api/orgs", DATA.orgs);
-  const { data: liveRepos } = useSplunkData("/api/repos", DATA.repos);
+  const { data: codeRollup } = useSplunkData("/api/code-rollup");
+  const { data: orgs } = useSplunkData("/api/orgs");
+  const { data: liveRepos } = useSplunkData("/api/repos");
   const r = codeRollup || { reposTotal: 0, reposScanned: 0, filesScanned: 0, findings: 0, critical: 0, fixablePR: 0 };
   const real = useScannedRepos();
   const seedRepos = liveRepos || [];
@@ -183,7 +182,7 @@ export function Repos({ go }) {
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1.25fr", gap: 16 }}>
           <Panel title="Repositories" subtitle={`${allRepos.length} repos${real.length ? ` · ${real.length} live` : ""} · ranked by crypto risk`} pad={0}
-            right={<span style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--tx-mut)" }}><ProviderMark provider="github" size={14} /><ProviderMark provider="gitlab" size={14} /></span>}>
+            right={<span style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--tx-mut)" }}><ProviderMark provider="github" size={14} /></span>}>
             <div style={{ display: "flex", flexDirection: "column", maxHeight: 520, overflowY: "auto" }}>
               {allRepos.map((x) => {
                 const active = x.repo === sel;
@@ -270,7 +269,7 @@ export function Repos({ go }) {
 
 /* ---------------- AI Agent pipeline ---------------- */
 const AGENT_STEPS = [
-  { id: "ingest", label: "Ingest", icon: "globe", tool: "Splunk MCP Server", desc: "Pull org repo tree via GitHub/GitLab API → index to Splunk", detail: "Repos indexed to Splunk" },
+  { id: "ingest", label: "Ingest", icon: "globe", tool: "Splunk MCP Server", desc: "Pull org repo tree via GitHub API → index to Splunk", detail: "Repos indexed to Splunk" },
   { id: "detect", label: "Detect", icon: "search", tool: "Hosted model + regex corpus", desc: "Scan source for quantum-vulnerable crypto patterns", detail: "Findings detected" },
   { id: "correlate", label: "Correlate", icon: "radar", tool: "SPL correlation search", desc: "Join code findings with live TLS telemetry & cert inventory", detail: "code ↔ runtime ↔ PKI" },
   { id: "reason", label: "Reason", icon: "ai", tool: "Splunk AI Assistant", desc: "Rank by exposure × sensitivity, draft remediation", detail: "risk-weighted plan" },

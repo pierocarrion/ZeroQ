@@ -29,7 +29,7 @@ const PrimaryLink = ({ href, children }) => (
 );
 
 const CAPS = [
-  ["Repository scanning", "Scan every repo across your GitHub and GitLab orgs for quantum-vulnerable crypto — RSA, ECDSA P-256, legacy TLS, 3DES, pre-PQC dependencies — down to file and line."],
+  ["Repository scanning", "Scan every repo across your GitHub org for quantum-vulnerable crypto — RSA, ECDSA P-256, legacy TLS, 3DES, pre-PQC dependencies — down to file and line."],
   ["Network & HNDL", "Detect “harvest-now, decrypt-later” exfiltration: bulk encrypted egress to unknown destinations that signature-based SIEM never flags."],
   ["Unified risk score", "One weighted 0–100 score across code, network and PKI, trended over time and broken down by asset sensitivity."],
   ["Grounded assistant", "Ask in plain language. Answers are grounded on your live posture and scanned repositories, mapped to NIST and NSA deadlines."],
