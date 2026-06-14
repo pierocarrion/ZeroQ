@@ -1,5 +1,5 @@
-import AppShell from "@/components/AppShell";
+import { redirect } from "next/navigation";
 
-export default function AppPage() {
-  return <AppShell />;
+export default function AppIndexPage() {
+  redirect("/app/dashboard");
 }

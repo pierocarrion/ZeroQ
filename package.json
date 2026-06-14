@@ -4,23 +4,26 @@
   "private": true,
   "description": "ZeroQ — post-quantum crypto posture for code + network, on Splunk. Next.js app with real repo scanning and AI.",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "node scripts/dev-with-emitter.js",
+    "build": "node scripts/build-retry.js",
     "start": "next start",
-    "lint": "next lint",
-    "seed:splunk": "node scripts/seed-splunk.js"
+    "lint": "next lint"
   },
   "dependencies": {
-    "next": "14.2.5",
+    "better-sqlite3": "^12.10.0",
+    "next": "^14.2.35",
     "node-fetch": "^2.7.0",
-    "react": "18.3.1",
-    "react-dom": "18.3.1"
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "20.14.0",
     "@types/node-fetch": "^2.6.13",
     "@types/react": "18.3.3",
     "@types/react-dom": "18.3.0",
+    "cross-env": "^10.1.0",
     "typescript": "5.5.4"
   },
   "engines": {

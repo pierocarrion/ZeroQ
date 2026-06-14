@@ -6,18 +6,19 @@
 import { config } from "../config";
 import { createAIProvider } from "../ai/aiFactory";
 import { createSplunkClient } from "../splunk/splunkFactory";
+import { LocalDataClient } from "./LocalDataClient";
 import { ScanService } from "./ScanService";
 import { AssistantService } from "./AssistantService";
 import { PlanService } from "./PlanService";
 
 export function makeScanService(): ScanService {
-  return new ScanService(createSplunkClient(), config.scan.maxFiles);
+  return new ScanService(createSplunkClient(), new LocalDataClient(), config.scan.maxFiles);
 }
 
 export function makeAssistantService(): AssistantService {
-  return new AssistantService(createAIProvider(), createSplunkClient());
+  return new AssistantService(createAIProvider(), createSplunkClient(), new LocalDataClient());
 }
 
 export function makePlanService(): PlanService {
-  return new PlanService(createAIProvider(), createSplunkClient());
+  return new PlanService(createAIProvider(), createSplunkClient(), new LocalDataClient());
 }

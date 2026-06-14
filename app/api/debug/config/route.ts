@@ -1,17 +1,23 @@
 import { NextResponse } from "next/server";
-import { config } from "@/lib/config";
+import { getSetting } from "@/lib/db/settings";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const hecUrl = getSetting("SPLUNK_HEC_URL");
+  const hecToken = getSetting("SPLUNK_HEC_TOKEN");
+  const baseUrl = getSetting("SPLUNK_BASE_URL");
+  const username = getSetting("SPLUNK_USERNAME");
+  const password = getSetting("SPLUNK_PASSWORD");
+
   return NextResponse.json({
-    hecEnabled: config.splunk.hecEnabled,
-    searchEnabled: config.splunk.searchEnabled,
-    hecUrl: config.splunk.hecUrl,
-    baseUrl: config.splunk.baseUrl,
-    username: config.splunk.username,
-    password: config.splunk.password ? "***set***" : "***empty***",
-    skipTlsVerify: config.splunk.skipTlsVerify,
+    hecEnabled: !!(hecUrl && hecToken),
+    searchEnabled: !!(baseUrl && username && password),
+    hecUrl: hecUrl ?? null,
+    baseUrl: baseUrl ?? null,
+    username: username ?? null,
+    password: password ? "***set***" : "***empty***",
+    skipTlsVerify: getSetting("SPLUNK_SKIP_TLS_VERIFY") === "true",
   });
 }

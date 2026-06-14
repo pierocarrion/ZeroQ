@@ -51,51 +51,58 @@ An end-to-end AI-powered security operations platform that unifies code scanning
 | **Text description** of features and functionality | ✅ | This README |
 | **Demo video** (< 3 min, publicly posted) | 🎥 *[Add YouTube/Vimeo/Youku link here before submitting]* | `https://youtube.com/...` |
 | **Open-source code repository** | ✅ | This repo |
-| **Open source license** | ✅ | `MIT` (see bottom of file) |
-| **README with setup & run instructions** | ✅ | See [Quick start](#quick-start) below |
-| **Dependencies & example configs** | ✅ | `.env.example`, `package.json`, `data/` |
-| **Architecture diagram** | ✅ | See [Architecture](#architecture) and `docs/architecture.png` *(generate if needed)* |
+| **Open source license** | ✅ | [`LICENSE`](./LICENSE) |
+| **README with setup & run instructions** | ✅ | See [How the app runs on Splunk](#how-the-app-runs-on-splunk--install-configure-done) below |
+| **Dependencies & example configs** | ✅ | `.env.example`, `package.json`, `data/`, [`dataset/`](./dataset/) |
+| **Architecture diagram** | ✅ | See [Architecture at a Glance](#architecture-at-a-glance) and [`architecture_diagram.md`](./architecture_diagram.md) |
 
 ### Architecture at a Glance
 
+ZeroQ is a Next.js 14 application that works **with or without Splunk**.  
+When Splunk is connected, every scan and network observation flows into
+dedicated `crypto_*` indexes and is read back through the Splunk REST API.
+When Splunk is not connected, the app falls back to a local SQLite store so
+dashboards, the AI assistant and migration plans keep working.
+
 ```
-┌────────────────────────────────────────────────────────────────────────────┐
-│                           ZEROQ PLATFORM                                   │
-│  ┌─────────────┐    ┌──────────────┐    ┌─────────────────────────────────┐│
-│  │  GitHub /   │    │  AI Agent    │    │      Next.js 14 Dashboard       ││
-│  │  GitLab     │───►│  (DeepSeek   │◄───│  /app  →  Risk, Inventory,      ││
-│  │  Repos      │    │   + Local)   │    │  Compliance, Assistant, Plan    ││
-│  └─────────────┘    └──────┬───────┘    └─────────────────────────────────┘│
-│                            │                                               │
-│                            │ queries live data                             │
-│                            ▼                                               │
-│  ┌───────────────────────────────────────────────────────────────────────┐ │
-│  │                         SPLUNK CLOUD / ENTERPRISE                     │ │
-│  │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────────┐       │ │
-│  │  │crypto_source│  │crypto_net  │  │crypto_pki  │  │crypto_hndl │      │ │
-│  │  │  (findings) │  │  (Zeek)    │  │(certificates│  │  (anomalies)│    │ │
-│  │  └────────────┘  └────────────┘  └────────────┘  └────────────┘       │ │
-│  │         ▲                ▲              ▲               ▲             │ │
-│  │         └────────────────┴──────────────┴───────────────┘             │ │
-│  │                         Splunk HEC (Ingest)                           │ │
-│  │                         Splunk REST API (Read)                        │ │
-│  └───────────────────────────────────────────────────────────────────────┘ │
-│                                    │                                       │
-│                                    ▼                                       │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                     ZEROQ SPLUNK APP (Native)                        │  │
-│  │  • Risk Dashboard  • Inventory  • PKI  • HNDL  • Compliance  • Alerts│  │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-└────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            ZEROQ PLATFORM                                   │
+│  ┌─────────────┐   ┌──────────────┐   ┌──────────────────────────────────┐  │
+│  │  GitHub /   │   │   AI Agent   │   │      Next.js 14 Dashboard        │  │
+│  │  GitLab     │──►│ (DeepSeek +  │◄──│  /        Landing                 │  │
+│  │  Repos      │   │ local fallback)│  │  /app     Risk, Inventory, ...   │  │
+│  └─────────────┘   └──────┬───────┘   │  /onboarding  Splunk + GitHub setup│  │
+│                           │           └──────────────────────────────────┘  │
+│                           │ queries live data                               │
+│                           ▼                                                 │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │  Data layer (Splunk first, SQLite fallback)                           │  │
+│  │  ┌─────────────────────────────┐  ┌─────────────────────────────────┐ │  │
+│  │  │  SPLUNK CLOUD / ENTERPRISE  │  │  SQLite  (data/zeroq.db)        │ │  │
+│  │  │  crypto_source · crypto_net │  │  scans · tls_scans · cert_scans │ │  │
+│  │  │  crypto_pki · crypto_hndl   │  │  domains · settings             │ │  │
+│  │  │  crypto_plan                │  │                                 │ │  │
+│  │  └─────────────────────────────┘  └─────────────────────────────────┘ │  │
+│  │         HEC (write)  │  REST SPL (read)                               │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                                    │                                        │
+│                                    ▼                                        │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │                     ZEROQ SPLUNK APP (native)                         │  │
+│  │  Risk · Inventory · Certificate Planner · HNDL · Compliance · Alerts  │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 **Data Flow**
-1. **Ingest** — Repository scans and network seed data flow into Splunk via HEC.
-2. **Index** — Data lives in purpose-built `crypto_*` indexes.
-3. **Detect** — 18 heuristic rules flag quantum-vulnerable crypto usage.
-4. **Correlate** — The AI assistant queries Splunk live to answer questions like *"Which repos use RSA-2048 AND talk to production networks?"*
-5. **Plan** — `PlanService` generates a ranked migration roadmap.
-6. **Visualize** — Next.js dashboards + native Splunk dashboards give analysts two views of the same truth.
+1. **Connect** — Use `/onboarding` (or `.env.local`) to store Splunk + GitHub settings in SQLite.
+2. **Scan code** — `/api/scan` pulls files from GitHub/GitLab, runs the 18-rule detector, and persists results to SQLite + Splunk HEC in parallel.
+3. **Scan network** — `/api/scan-tls` connects to owned hosts on port 443 and stores TLS/certificate data in SQLite (also queryable from Splunk when configured).
+4. **Index** — Code findings land in `crypto_source`; network/PKI/HNDL/plan data lives in the other `crypto_*` indexes.
+5. **Read** — Dashboard APIs prefer live Splunk REST results; if Splunk is empty or offline, `LocalDataClient` serves the same shape from SQLite.
+6. **Detect HNDL** — `/api/hndl/generate` builds Harvest-Now-Decrypt-Later anomaly signals from TLS scan data (or reads them from `crypto_hndl` when Splunk is connected).
+7. **Reason** — `AssistantService` and `PlanService` call DeepSeek when `DEEPSEEK_API_KEY` is set; otherwise a deterministic local reasoner answers.
+8. **Visualize** — Next.js dashboards (`/app`) and the native Splunk app (`zeroq-splunk-app`) render the same data.
 
 ---
 
@@ -112,39 +119,77 @@ An end-to-end AI-powered security operations platform that unifies code scanning
 
 ---
 
-## Quick start
+## How the app runs on Splunk — install, configure, done
+
+ZeroQ is designed to be deployed in three steps on any Splunk Cloud Trial,
+Splunk Enterprise or Splunk Cloud instance.
+
+### 1. Install
 
 ```bash
+# Install Node dependencies
 npm install
-npm run dev          # http://localhost:3000  (landing)  ·  /app  (dashboard)
+
+# Package the native Splunk app
+cd zeroq-splunk-app
+tar -czvf ../zeroq-splunk-app.spl .
 ```
 
-Open `/app`, go to **Repository Scanner**, and scan e.g. `openssl/openssl`,
-`square/okhttp` or any `owner/repo`. It works with **zero configuration** using
-seed/demo data; connect Splunk to unlock live dashboards.
+In Splunk Web: **Apps → Manage Apps → Install app from file** and upload
+`zeroq-splunk-app.spl`. The app creates five indexes automatically via
+`default/indexes.conf` and ships five dashboards plus three saved searches.
 
----
+### 2. Configure
 
-## Splunk Trial setup
+Either use the guided UI or edit `.env.local`.
 
-1. Create a **Splunk Cloud Trial** at https://www.splunk.com/en_us/download/splunk-cloud.html
-   (14 days, 5 GB/day).
-2. Enable **HTTP Event Collector** and create a token with access to these indexes:
-   `crypto_source`, `crypto_net`, `crypto_pki`, `crypto_hndl`, `crypto_plan`.
-3. Create those 5 indexes in Splunk Web.
-4. Create a user (e.g. `zeroq_api`) with search access to the indexes.
-5. Copy `.env.example` to `.env.local` and fill in HEC + REST API credentials.
-6. Seed demo data into Splunk:
-   ```bash
-   npm run seed:splunk
-   ```
-7. Install the Splunk App:
-   ```bash
-   cd zeroq-splunk-app
-   tar -czvf ../zeroq-splunk-app.spl .
-   ```
-   Then in Splunk Web: **Apps → Manage Apps → Install app from file** and upload
-   `zeroq-splunk-app.spl`.
+**Option A — Guided onboarding (recommended)**
+1. Start the app: `npm run dev`
+2. Open `http://localhost:3000/onboarding`
+3. Enter your Splunk HEC URL + token, Splunk REST URL + username + password,
+   and optional GitHub/GitLab token and DeepSeek API key.
+4. Click **Test connection** — the onboarding wizard validates HEC and REST,
+   auto-creates an HEC input if needed, and saves settings to SQLite.
+
+**Option B — `.env.local`**
+```bash
+cp .env.example .env.local
+# edit with your Splunk credentials
+```
+
+Required Splunk variables:
+
+| Variable | Purpose |
+|---|---|
+| `SPLUNK_HEC_URL` + `SPLUNK_HEC_TOKEN` | Push code-scan findings |
+| `SPLUNK_BASE_URL` + `SPLUNK_USERNAME` + `SPLUNK_PASSWORD` | Read live posture |
+| `SPLUNK_INDEX_*` | Target indexes (defaults: `crypto_*`) |
+
+Optional:
+
+| Variable | Purpose |
+|---|---|
+| `GITHUB_TOKEN` / `GITLAB_TOKEN` | Private repos + higher rate limits |
+| `DEEPSEEK_API_KEY` | Live LLM for Assistant + Org Plan |
+
+### 3. Done
+
+```bash
+npm run dev        # http://localhost:3000
+```
+
+Open `/app` and:
+
+1. **Scan a repo** — Repository Scanner → e.g. `openssl/openssl`
+2. **Scan your network** — Network Inventory → add a domain → Scan TLS
+3. **Ask the AI Assistant** — e.g. *"Which repos have critical findings?"*
+4. **Generate HNDL signals** — HNDL Detection → Generate from network data (uses your TLS scans)
+5. **Generate a migration plan** — Org Security Plan → Generate Plan
+6. **View in Splunk** — Apps → ZeroQ → open the dashboards
+
+If Splunk is not configured, the app runs in **local mode**: every scan is
+stored in `data/zeroq.db` and dashboards show local data with a badge
+"Local · SQLite".
 
 A full runbook with screenshots and troubleshooting is in [`DEMO.md`](./DEMO.md).
 
@@ -170,59 +215,74 @@ cp .env.example .env.local
 
 ## Architecture (Detailed)
 
-The backend follows a layered, SOLID design — route handlers are thin controllers that
-delegate to services, which depend on **interfaces** (providers), not concretions.
+The backend follows a layered, SOLID design — route handlers are thin
+controllers that delegate to services, which depend on interfaces
+(providers), not concretions.
 
 ```
-app/api/*           thin controllers (validate → call service → map errors)
+app/
+  page.tsx           Landing page
+  app/               Next.js dashboard (Risk, Inventory, Certs, etc.)
+  onboarding/        Guided Splunk/GitHub setup wizard
+  api/               Thin controllers (validate → service → map errors)
 lib/
-  config.ts         typed env access — the only reader of process.env
-  rules.ts          crypto rule set (append rules to extend; OCP)
-  scanning/         detector · scoring · target        (pure functions, SRP)
-  providers/        SourceProvider (interface) ← GitHubProvider, GitLabProvider (LSP)
-                    + sourceProviderFactory             (OCP: add a host, add a case)
-  ai/               AIProvider (interface) ← DeepSeekProvider, LocalReasoner
-                    + aiFactory
-  splunk/           SplunkClient (interface) ← HecSplunkClient, NoopSplunkClient
-                    + SplunkSearchClient for REST SPL queries
-  services/         ScanService · AssistantService · PlanService · PostureContext
-                    composition.ts = composition root (wires concretions; DIP)
-seed.ts data.ts     demo dataset + barrel
-components/          React UI (client components)
-zeroq-splunk-app/      Splunk app with dashboards, saved searches, alerts and lookups
-scripts/             seed-splunk.js — loads demo data into Splunk via HEC
+  config.ts          Typed env access; reads SQLite settings first, then process.env
+  rules.ts           18 quantum-vulnerable crypto rules (append to extend; OCP)
+  scanning/          detector · scoring · target  (pure functions, SRP)
+  providers/         SourceProvider interface ← GitHubProvider, GitLabProvider
+  ai/                AIProvider interface ← DeepSeekProvider, LocalReasoner
+  splunk/            SplunkClient interface ← HecSplunkClient, SplunkSearchClient
+  services/          ScanService · AssistantService · PlanService · TlsScanner
+                     composition.ts wires concretions (DIP)
+  db/                SQLite connection + settings store
+data/zeroq.db        Local store for scans, TLS scans, certificates, domains, settings
+zeroq-splunk-app/    Native Splunk app (dashboards, saved searches, alerts, lookups)
+scripts/             purge-splunk.js — cleans ZeroQ events from Splunk indexes
 ```
 
-- **SRP** — each module has one reason to change (detector detects, scoring scores, providers do I/O).
-- **OCP** — add a rule by appending to `rules.ts`; add a code host by adding a provider + a factory case.
+- **SRP** — each module has one reason to change.
+- **OCP** — add a rule by appending to `rules.ts`; add a code host by adding a provider.
 - **LSP** — `GitHubProvider` and `GitLabProvider` are interchangeable behind `SourceProvider`.
-- **ISP** — small, focused interfaces (`SourceProvider.loadRepository`, `AIProvider.complete`, `SplunkClient.sendFindings`).
-- **DIP** — services receive abstractions; `composition.ts` is the single place that picks implementations.
+- **ISP** — small interfaces (`SourceProvider.loadRepository`, `AIProvider.complete`, `SplunkClient.sendFindings`).
+- **DIP** — services receive abstractions; `composition.ts` is the single wiring point.
+
+### Splunk integration
+
+| Direction | Mechanism | Indexes | Sourcetypes |
+|---|---|---|---|
+| Write | HEC `/services/collector/event` | `crypto_source` | `zeroq:crypto_finding` |
+| Read | REST `/services/search/jobs` | `crypto_net`, `crypto_pki`, `crypto_hndl`, `crypto_plan` | `zeroq:tls_connection`, `zeroq:cert`, `zeroq:hndl_event`, `zeroq:plan`, `zeroq:roadmap`, `zeroq:org_plan`, `zeroq:repo_meta` |
+| Native app | `zeroq-splunk-app.spl` | creates `crypto_*` via `indexes.conf` | props/transforms for JSON parsing |
 
 ### Data Flow Detail
 
 ```
-GitHub / GitLab ─┐
-Seed loader      ├─►  Next API ──► Splunk HEC ──► crypto_* indexes ──┐
-(Zeek/PKI/HNDL)  │                                                  │
-                 │                                                  ▼
-                 │                                           Splunk Search API
-                 │                                                  │
-                 └──► /api/scan (detector) ─────────────────────────┤
-                                                                    │
-                              ZeroQ Dashboard (/app) ◄────────────────┘
-                              AI Assistant + Org Plan
+GitHub/GitLab ──┐
+onboarding      ├──► Next API ──► ScanService ──► SQLite (always)
+                │                                    │
+                │                                    ▼
+                │                              HecSplunkClient (if configured)
+                │                                    │
+                │                                    ▼
+                │                            crypto_* indexes
+                │                                    │
+TLS scan host ◄─┘                                    ▼
+                │                              SplunkSearchClient
+                │                                    │
+                ▼                                    ▼
+         data/zeroq.db ◄──────────────────── ZeroQ Dashboard (/app)
+                                             AI Assistant + Org Plan
+                                             Native Splunk dashboards
 ```
 
-1. **Ingest** — `lib/providers/*` pull repo trees + raw blobs (GitHub / GitLab), or
-   `scripts/seed-splunk.js` pushes illustrative network/PKI/HNDL events.
-2. **Index** — all events land in Splunk via HEC under `crypto_*` indexes.
-3. **Detect** — `lib/scanning/detector.ts` applies the `rules.ts` set: RSA, ECDSA/P-256,
-   legacy TLS, 3DES, RS256, SHA-1/MD5, unpinned TLS and pre-PQC dependencies.
-4. **Correlate / Reason** — `PlanService` asks the model to rank findings by exposure ×
-   sensitivity and produce a time-boxed plan. The AI Assistant can query Splunk live.
-5. **Visualize** — Next.js dashboards read from Splunk Search API; native Splunk dashboards
-   live inside `zeroq-splunk-app/`.
+1. **Configure** — Settings are stored in SQLite first; `config.ts` reads SQLite, then `process.env`, then defaults.
+2. **Ingest code** — `SourceProvider` pulls repo trees + blobs; `detector.ts` applies `rules.ts`.
+3. **Ingest network** — `TlsScanner` connects to owned hosts and stores TLS/certificate metadata.
+4. **Persist** — Every scan is saved to SQLite via `LocalDataClient`. When Splunk is enabled, the same events are pushed via HEC in parallel.
+5. **Index** — Splunk indexes are defined in `zeroq-splunk-app/default/indexes.conf`; sourcetypes and field extractions are in `props.conf`.
+6. **Read** — `dataSource.ts` tries Splunk first, falls back to SQLite, and tags the response with `source: "splunk" | "local"`.
+7. **Reason** — `AssistantService` builds a posture context from live data; `PlanService` generates a ranked migration plan.
+8. **Alert** — Saved searches in `savedsearches.conf` trigger on critical findings, expiring certs and HNDL anomalies.
 
 ---
 
@@ -230,16 +290,33 @@ Seed loader      ├─►  Next API ──► Splunk HEC ──► crypto_* ind
 
 | Route | Method | Description |
 |---|---|---|
-| `/api/scan` | POST | Scan a repo and optionally push findings to Splunk HEC. |
+| `/api/scan` | POST | Scan a repo and persist to SQLite + optional Splunk HEC. |
+| `/api/scan-batch` | POST | Scan multiple repos in one call. |
+| `/api/scan-tls` | POST | Scan TLS/certificate of owned hosts. |
 | `/api/ingest` | POST | Push an existing `ScanResult` to Splunk HEC. |
-| `/api/risk` | GET | Health check + risk score + capability flags. |
-| `/api/inventory` | GET | Live TLS connection inventory from Splunk (fallback to seed). |
-| `/api/certs` | GET | Live certificate inventory from Splunk (fallback to seed). |
-| `/api/hndl` | GET | Live HNDL anomalies from Splunk (fallback to seed). |
-| `/api/compliance` | GET | Live compliance stats from Splunk (fallback to seed). |
+| `/api/domains` | GET/POST/DELETE | Manage TLS scan targets. |
+| `/api/risk` | GET | Risk score + capability flags + data source badge. |
+| `/api/inventory` | GET | Live TLS inventory from Splunk or SQLite. |
+| `/api/certs` | GET | Live certificate inventory from Splunk or SQLite. |
+| `/api/hndl` | GET | HNDL anomalies from Splunk. |
+| `/api/hndl/timeline` | GET | HNDL volume timeline. |
+| `/api/compliance` | GET | Compliance mapping from Splunk or SQLite. |
+| `/api/algo-mix` | GET | Algorithm mix across network observations. |
+| `/api/top-assets` | GET | Top risky assets. |
+| `/api/trends` | GET | Risk trend over time. |
+| `/api/roadmap` | GET | Migration roadmap phases. |
+| `/api/orgs` | GET | Connected organizations. |
+| `/api/repos` | GET | Repository list from Splunk or SQLite. |
+| `/api/code-rollup` | GET | Aggregated code findings. |
+| `/api/org-plan` | POST | Generate or retrieve organization migration plan. |
+| `/api/plan` | POST | AI-generated migration plan (legacy). |
+| `/api/assistant` | POST | AI chat grounded on posture context. |
 | `/api/splunk/query` | POST | Controlled SPL query execution for the AI Assistant. |
-| `/api/assistant` | POST | AI chat grounded on posture context + scanned repos. |
-| `/api/plan` | POST | AI-generated migration plan. |
+| `/api/health/splunk` | GET | Connectivity check against Splunk REST. |
+| `/api/onboarding/config` | GET/POST | Read/write onboarding settings in SQLite. |
+| `/api/onboarding/test-splunk` | POST | Validate HEC + REST and auto-create HEC input. |
+| `/api/onboarding/test-github` | POST | Validate GitHub token/organization. |
+| `/api/debug/config` | GET | Sanitized config dump for troubleshooting. |
 
 ---
 
@@ -247,22 +324,29 @@ Seed loader      ├─►  Next API ──► Splunk HEC ──► crypto_* ind
 
 ```
 ├── app/                    # Next.js App Router (pages + API routes)
+│   ├── api/                # REST API controllers
+│   ├── app/                # Dashboard UI
+│   ├── onboarding/         # Guided setup wizard
+│   └── page.tsx            # Landing page
 ├── components/             # React UI (Landing, Dashboard, Agent Console)
+├── dataset/                # Example JSON datasets for each crypto_* index
 ├── lib/
 │   ├── ai/                 # AI providers (DeepSeek, Local fallback)
+│   ├── db/                 # SQLite connection + settings store
 │   ├── providers/          # GitHub / GitLab source providers
 │   ├── scanning/           # Quantum crypto detector engine
-│   ├── services/           # Business logic (Scan, Assistant, Plan)
+│   ├── services/           # Business logic (Scan, Assistant, Plan, TLS)
 │   ├── splunk/             # HEC + REST Search clients
 │   ├── config.ts           # Typed environment configuration
-│   ├── data.ts             # Demo / seed datasets
 │   ├── rules.ts            # 18 detection rules
 │   └── types.ts            # Shared TypeScript contracts
-├── data/                   # Additional static data assets
+├── data/                   # SQLite database + static assets
 ├── scripts/
-│   └── seed-splunk.js      # One-command Splunk demo data loader
+│   └── purge-splunk.js     # Purge all ZeroQ events from Splunk indexes
 ├── zeroq-splunk-app/       # Native Splunk app (dashboards, alerts, lookups)
 ├── .env.example            # Required environment variables template
+├── architecture_diagram.md # Architecture diagram (Mermaid + ASCII)
+├── LICENSE                 # MIT license
 ├── DEMO.md                 # Step-by-step runbook with screenshots
 └── README.md               # This file
 ```
@@ -273,10 +357,13 @@ Seed loader      ├─►  Next API ──► Splunk HEC ──► crypto_* ind
 
 - The crypto rules are heuristic (regex + dependency version checks). They are designed to
   highlight quantum-vulnerable usage for triage, not to be a formal verifier.
-- Network inspection in a real deployment is **passive** — only TLS handshake metadata is
-  read from Zeek logs; no payloads are decrypted.
-- If Splunk is not configured, the app degrades gracefully to seed data and the scanner
-  still works in standalone mode.
+- Network inspection is **passive** — `scan-tls` only reads TLS handshake metadata and
+  certificate properties; no payloads are decrypted.
+- HNDL anomalies can be **generated locally** from TLS scan data when Splunk egress
+  telemetry is not available.
+- If Splunk is not configured, the app runs in **local SQLite mode**: scans, TLS checks,
+  certificates and HNDL events are stored in `data/zeroq.db` and dashboards render local data.
+- Example datasets for every `crypto_*` index are in [`dataset/`](./dataset/).
 
 ---
 

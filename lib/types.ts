@@ -122,6 +122,8 @@ export interface RepoSeed {
   grade: string;
   findings: number;
   critical: number;
+  high: number;
+  monitor: number;
   lastCommit: string;
   branch: string;
   owner: string;
@@ -181,4 +183,38 @@ export interface AICompletionRequest {
   system: string;
   messages: AssistantMessage[];
   maxTokens?: number;
+}
+
+/** A single compliance control result. */
+export interface ComplianceControl {
+  id: string;
+  framework: string;
+  authority: string;
+  title: string;
+  description: string;
+  state: "passed" | "failed" | "partial";
+  score: number; // 0-100
+  evaluated: number;
+  failures: number;
+  recommendation: string;
+}
+
+/** A framework-level compliance posture summary. */
+export interface ComplianceFramework {
+  framework: string;
+  authority: string;
+  desc: string;
+  progress: number;
+  mapped: number;
+  atRisk: number;
+  controls: ComplianceControl[];
+}
+
+/** Aggregate compliance summary returned by /api/compliance. */
+export interface ComplianceSummary {
+  overallProgress: number;
+  totalControls: number;
+  passedControls: number;
+  atRiskAssets: number;
+  totalAssets: number;
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSplunkClient } from "@/lib/splunk/splunkFactory";
+import { getInventory } from "@/lib/services/dataSource";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,12 +13,9 @@ export async function GET(req: NextRequest) {
       version: searchParams.get("version") || undefined,
       cipher: searchParams.get("cipher") || undefined,
     };
-    const splunk = createSplunkClient();
-    const live = await splunk.getInventory(filters);
-    if (live && live.length > 0) {
-      return NextResponse.json({ data: live, source: "splunk" });
-    }
-    return NextResponse.json({ data: null, source: null });
+    const { data, source } = await getInventory(filters);
+    console.log("[api/inventory] source:", source, "rows:", data?.length ?? 0);
+    return NextResponse.json({ data, source });
   } catch (e: any) {
     return NextResponse.json({ data: null, source: null, error: e?.message }, { status: 200 });
   }

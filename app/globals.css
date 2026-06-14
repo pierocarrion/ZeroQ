@@ -127,6 +127,10 @@ html, body {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+@keyframes zeroq-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
 
 /* Content is always visible. No auto-playing entrance animation:
    throttled/background tabs freeze the animation clock at frame 0,

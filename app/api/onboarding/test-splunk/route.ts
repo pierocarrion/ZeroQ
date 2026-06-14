@@ -37,6 +37,48 @@ function networkError(e: any): string {
   return msg;
 }
 
+async function createHecInput(baseUrl: string, username: string, password: string, skipTlsVerify?: boolean): Promise<{ token?: string; error?: string }> {
+  const auth = "Basic " + Buffer.from(`${username}:${password}`).toString("base64");
+  const name = "zeroq";
+
+  try {
+    const createRes = await splunkFetch(`${normalize(baseUrl)}/services/data/inputs/http/${name}`, {
+      method: "POST",
+      headers: {
+        Authorization: auth,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({ name, disabled: "0" }).toString(),
+    }, skipTlsVerify);
+
+    if (!createRes.ok && createRes.status !== 409) {
+      const text = await createRes.text().catch(() => "");
+      return { error: `Create HEC ${createRes.status}: ${text.slice(0, 200)}` };
+    }
+  } catch (e: any) {
+    return { error: networkError(e) };
+  }
+
+  try {
+    const infoRes = await splunkFetch(`${normalize(baseUrl)}/services/data/inputs/http/zeroq?output_mode=json`, {
+      headers: { Authorization: auth },
+    }, skipTlsVerify);
+
+    if (!infoRes.ok) {
+      const text = await infoRes.text().catch(() => "");
+      return { error: `Read HEC ${infoRes.status}: ${text.slice(0, 200)}` };
+    }
+
+    const info = await infoRes.json();
+    const entry = info.entry?.[0];
+    const token = entry?.content?.token;
+    if (token) return { token };
+    return { error: "HEC input created but token not found in response" };
+  } catch (e: any) {
+    return { error: networkError(e) };
+  }
+}
+
 // POST /api/onboarding/test-splunk { hecUrl, hecToken, baseUrl, username, password, skipTlsVerify }
 export async function POST(req: NextRequest) {
   let body: {
@@ -54,9 +96,10 @@ export async function POST(req: NextRequest) {
   }
 
   const checks: Record<string, any> = {};
+  let generatedToken: string | undefined;
 
   // Test HEC
-  if (body.hecUrl && body.hecToken) {
+  if (body.hecUrl) {
     const hecUrl = normalize(body.hecUrl);
     let hecOk = false;
     let hecErr = "";
@@ -67,7 +110,7 @@ export async function POST(req: NextRequest) {
         const res = await splunkFetch(`${hecUrl}${path}`, {
           method: "POST",
           headers: {
-            Authorization: `Splunk ${body.hecToken}`,
+            Authorization: `Splunk ${body.hecToken || "invalid"}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ event: { test: true, source: "zeroq-healthcheck" } }),
@@ -87,7 +130,36 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    checks.hec = hecOk ? { ok: true } : { ok: false, error: hecErr || "HEC test failed" };
+    // If no token was provided or HEC failed, try to create one via REST.
+    if (!hecOk && body.baseUrl && body.username && body.password) {
+      const created = await createHecInput(body.baseUrl, body.username, body.password, body.skipTlsVerify);
+      if (created.token) {
+        generatedToken = created.token;
+        // Verify the newly created token works.
+        try {
+          const res = await splunkFetch(`${hecUrl}/services/collector/event/1.0`, {
+            method: "POST",
+            headers: {
+              Authorization: `Splunk ${created.token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ event: { test: true, source: "zeroq-healthcheck" } }),
+          }, body.skipTlsVerify);
+          if (res.ok || res.status === 400) {
+            hecOk = true;
+            hecErr = "";
+          } else {
+            hecErr = `HEC ${res.status}: ${(await res.text().catch(() => "")).slice(0, 120)}`;
+          }
+        } catch (e: any) {
+          hecErr = networkError(e);
+        }
+      } else {
+        hecErr = hecErr || created.error || "Could not auto-create HEC token";
+      }
+    }
+
+    checks.hec = hecOk ? { ok: true, token: generatedToken } : { ok: false, error: hecErr || "HEC test failed" };
   }
 
   // Test REST Search
@@ -99,7 +171,6 @@ export async function POST(req: NextRequest) {
     for (const candidate of candidateUrls(body.baseUrl)) {
       if (restOk) break;
 
-      // 1) Try POST /services/auth/login (always present in Splunk)
       try {
         const loginBody = new URLSearchParams({ username: body.username, password: body.password });
         const res = await splunkFetch(`${candidate}/services/auth/login`, {
@@ -118,7 +189,6 @@ export async function POST(req: NextRequest) {
         restErr = networkError(e);
       }
 
-      // 2) Fallback to GET /services/server/info if login wasn't tried or gave 404
       if (!restOk && restErr.includes("404")) {
         try {
           const res = await splunkFetch(`${candidate}/services/server/info`, {

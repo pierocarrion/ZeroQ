@@ -10,7 +10,9 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const client = createSplunkClient();
+    console.log("[api/health/splunk] client.enabled:", client.enabled);
     if (!client.enabled) {
+      console.log("[api/health/splunk] not configured");
       return NextResponse.json({ ok: false, connected: false, reason: "Splunk not configured" });
     }
     // Quick REST check: hit /services/server/info with basic auth
@@ -20,6 +22,7 @@ export async function GET() {
       headers: { Authorization: auth },
     });
     const restOk = res.ok;
+    console.log("[api/health/splunk] REST check:", restOk, res.status);
     return NextResponse.json({ ok: restOk, connected: restOk, reason: restOk ? "" : `Splunk REST ${res.status}` });
   } catch (e: any) {
     return NextResponse.json({ ok: false, connected: false, reason: e?.message || "Splunk health check failed" });

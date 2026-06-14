@@ -4,9 +4,17 @@
 // ============================================================
 import { config } from "../config";
 import type { AlgoMixItem, CodeRollup, IngestResult, Org, OrgPlan, RepoSeed, RoadmapPhase, ScanResult, TopAsset } from "../types";
+import { evaluateCompliance, type ComplianceInput } from "../services/compliance";
 import type { SplunkClient, RiskSummary, TlsConnection, Certificate, HndlAnomaly, ComplianceStat, RiskTier } from "./SplunkClient";
 import { SplunkSearchClient } from "./SplunkSearchClient";
 import { splunkFetch } from "./fetchSplunk";
+
+const HNDL_DEMO_DOMAINS = new Set([
+  "collectors-ams.azureedge.net",
+  "backup-ny.s3-external-1.amazonaws.com",
+  "logs-eu1.datadoghq.com",
+  "203.0.113.47",
+]);
 
 export class HecSplunkClient implements SplunkClient {
   readonly enabled = true;
@@ -21,6 +29,7 @@ export class HecSplunkClient implements SplunkClient {
   }
 
   async sendFindings(result: ScanResult): Promise<IngestResult> {
+    console.log("[HecSplunkClient:sendFindings] repo:", result.repo, "findings:", result.detail.length);
     if (result.detail.length === 0) return { sent: 0, ok: true };
     const now = Date.now() / 1000;
     const events = result.detail.map((f) => ({
@@ -29,7 +38,7 @@ export class HecSplunkClient implements SplunkClient {
       source: "zeroq:scanner",
       sourcetype: "zeroq:crypto_finding",
       index: config.splunk.indexSource,
-      event: { repo: result.repo, provider: result.provider, grade: result.grade, ...f },
+      event: { repo: result.repo, provider: result.provider, grade: result.grade, branch: result.branch, owner: result.owner, lang: result.lang, ...f },
     }));
     const body = events.map((e) => JSON.stringify(e)).join("\n");
     try {
@@ -45,6 +54,7 @@ export class HecSplunkClient implements SplunkClient {
   }
 
   async getRiskSummary(): Promise<RiskSummary | null> {
+    console.log("[HecSplunkClient:getRiskSummary] search.enabled:", this.search.enabled);
     if (!this.search.enabled) return null;
     const src = config.splunk.indexSource;
     const [findingsRes, netRes, pkiRes, metaRes] = await Promise.all([
@@ -81,6 +91,7 @@ export class HecSplunkClient implements SplunkClient {
     ];
 
     const meta = metaRes.results[0] || {};
+    console.log("[HecSplunkClient:getRiskSummary] counts:", { critical, high, monitor, safe, endpointsScanned: meta.endpointsScanned });
     return {
       riskScore,
       riskBand,
@@ -136,35 +147,57 @@ export class HecSplunkClient implements SplunkClient {
     const idx = config.splunk.indexes.hndl;
     const spl = `index=${idx} sourcetype=zeroq:hndl_event source!="zeroq:seed" | spath input=_raw | dedup _raw | eval deviation=tonumber(mvindex(deviation,0)), sessions=tonumber(mvindex(sessions,0)) | sort - deviation | head 50`;
     const res = await this.search.query(spl, { earliest: "-7d", maxCount: 50 });
-    return res.results.map((r) => ({
-      dst: String(r.dst || ""),
-      asn: String(r.asn || ""),
-      geo: String(r.geo || ""),
-      volume: String(r.volume || ""),
-      baseline: String(r.baseline || ""),
-      deviation: Number(r.deviation || 0),
-      sessions: Number(r.sessions || 0),
-      window: String(r.window || ""),
-      status: (String(r.status || "watch") as HndlAnomaly["status"]),
-      note: String(r.note || ""),
-      _time: String(r._time || ""),
-    }));
+    return res.results
+      .filter((r) => !HNDL_DEMO_DOMAINS.has(String(r.dst || "")))
+      .map((r) => ({
+        dst: String(r.dst || ""),
+        asn: String(r.asn || ""),
+        geo: String(r.geo || ""),
+        volume: String(r.volume || ""),
+        baseline: String(r.baseline || ""),
+        deviation: Number(r.deviation || 0),
+        sessions: Number(r.sessions || 0),
+        window: String(r.window || ""),
+        status: (String(r.status || "watch") as HndlAnomaly["status"]),
+        note: String(r.note || ""),
+        _time: String(r._time || ""),
+      }));
   }
 
   async getComplianceStats(): Promise<ComplianceStat[] | null> {
     if (!this.search.enabled) return null;
-    const idx = config.splunk.indexSource;
-    const spl = `index=${idx} sourcetype=zeroq:crypto_finding source!="zeroq:seed" earliest=-90d | spath input=_raw | dedup _raw | eval framework=case(match(kind,"RSA"),"NIST FIPS 140-3",match(kind,"ECDSA"),"NIST SP 800-186",match(kind,"TLS"),"IETF RFC 8446",true(),"General"), authority=case(match(kind,"RSA"),"NIST",match(kind,"ECDSA"),"NIST",match(kind,"TLS"),"IETF",true(),"Internal"), desc=kind | stats count by framework, authority, desc | eval progress=0, mapped=count, atRisk=count`;
-    const res = await this.search.query(spl, { earliest: "-90d", maxCount: 50 });
-    if (res.results.length === 0) return null;
-    return res.results.map((r) => ({
-      framework: String(r.framework || ""),
-      authority: String(r.authority || ""),
-      desc: String(r.desc || ""),
-      progress: Number(r.progress || 0),
-      mapped: Number(r.mapped || 0),
-      atRisk: Number(r.atRisk || 0),
-    }));
+    const src = config.splunk.indexSource;
+    const net = config.splunk.indexes.net;
+    const pki = config.splunk.indexes.pki;
+
+    const [repoRes, tlsRes, certRes] = await Promise.all([
+      this.search.query(`index=${src} sourcetype=zeroq:crypto_finding source!="zeroq:seed" earliest=-90d | spath input=_raw | dedup _raw | table repo, kind, sev`, { earliest: "-90d", maxCount: 1000 }),
+      this.search.query(`index=${net} sourcetype=zeroq:tls_connection source!="zeroq:seed" earliest=-7d | spath input=_raw | dedup _raw | table host, version, cipher, curve, risk`, { earliest: "-7d", maxCount: 1000 }),
+      this.search.query(`index=${pki} sourcetype=zeroq:cert source!="zeroq:seed" | spath input=_raw | dedup _raw | table host, urgency`, { maxCount: 1000 }),
+    ]);
+
+    if (repoRes.results.length === 0 && tlsRes.results.length === 0 && certRes.results.length === 0) return null;
+
+    const input: ComplianceInput = {
+      repoFindings: repoRes.results.map((r: any) => ({
+        repo: String(r.repo || ""),
+        kind: String(r.kind || ""),
+        sev: String(r.sev || "monitor") as any,
+      })).filter((r) => r.repo && r.kind),
+      tlsScans: tlsRes.results.map((r: any) => ({
+        host: String(r.host || ""),
+        version: String(r.version || ""),
+        cipher: String(r.cipher || ""),
+        curve: String(r.curve || ""),
+        risk: String(r.risk || ""),
+      })).filter((r) => r.host),
+      certScans: certRes.results.map((r: any) => ({
+        host: String(r.host || ""),
+        urgency: String(r.urgency || "monitor") as any,
+      })).filter((r) => r.host),
+    };
+
+    return evaluateCompliance(input).frameworks;
   }
 
   async getAlgoMix(): Promise<AlgoMixItem[] | null> {
@@ -294,6 +327,8 @@ export class HecSplunkClient implements SplunkClient {
         grade: String(r.grade || "A"),
         findings: Number(r.findings || 0),
         critical: Number(r.critical || 0),
+        high: Number(r.high || 0),
+        monitor: Number(r.monitor || 0),
         lastCommit: "—",
         branch: String(r.branch || "main"),
         owner: String(r.owner || ""),

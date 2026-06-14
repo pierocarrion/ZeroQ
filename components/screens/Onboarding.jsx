@@ -164,6 +164,9 @@ function SplunkStep({ config, setConfig, onNext }) {
         }),
       });
       const data = await res.json();
+      if (data.checks?.hec?.token) {
+        setConfig((c) => ({ ...c, splunkHecToken: data.checks.hec.token }));
+      }
       setTestResult(data);
     } catch (e) {
       setTestResult({ ok: false, error: e?.message || "Network error" });
@@ -187,7 +190,7 @@ function SplunkStep({ config, setConfig, onNext }) {
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <Input label="HEC URL" value={config.splunkHecUrl} onChange={(v) => setConfig((c) => ({ ...c, splunkHecUrl: v }))} placeholder="https://tenant.splunkcloud.com:8088" />
-          <Input label="HEC Token" type="password" value={config.splunkHecToken} onChange={(v) => setConfig((c) => ({ ...c, splunkHecToken: v }))} placeholder="abcd1234-..." />
+          <Input label="HEC Token" type="password" value={config.splunkHecToken} onChange={(v) => setConfig((c) => ({ ...c, splunkHecToken: v }))} placeholder="leave empty to auto-create" />
         </div>
       </div>
 
@@ -420,7 +423,7 @@ function AIStep({ config, setConfig, onFinish }) {
       </div>
 
       <p style={{ fontSize: 12, color: "var(--tx-dim)", margin: 0 }}>
-        Note: after saving, restart <code style={{ fontSize: 11 }}>npm run dev</code> for all environment variables to take effect.
+        Configuration is saved to the local SQLite database and takes effect immediately.
       </p>
     </div>
   );
@@ -433,12 +436,12 @@ export default function Onboarding() {
   const [config, setConfig] = useState({
     githubOrg: "",
     selectedRepos: [],
-    splunkHecUrl: "",
+    splunkHecUrl: "https://localhost:8088",
     splunkHecToken: "",
-    splunkBaseUrl: "",
-    splunkUsername: "",
-    splunkPassword: "",
-    splunkSkipTlsVerify: "",
+    splunkBaseUrl: "https://localhost:8089",
+    splunkUsername: "sc_admin",
+    splunkPassword: "j6n7ba2tz1lbm6nb",
+    splunkSkipTlsVerify: "true",
     deepseekApiKey: "",
     aiProvider: "deepseek",
   });

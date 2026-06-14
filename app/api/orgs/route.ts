@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createSplunkClient } from "@/lib/splunk/splunkFactory";
+import { getOrgs } from "@/lib/services/dataSource";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -7,12 +7,8 @@ export const dynamic = "force-dynamic";
 // GET /api/orgs
 export async function GET() {
   try {
-    const splunk = createSplunkClient();
-    const live = await splunk.getOrgs();
-    if (live && live.length > 0) {
-      return NextResponse.json({ data: live, source: "splunk" });
-    }
-    return NextResponse.json({ data: null, source: null });
+    const { data, source } = await getOrgs();
+    return NextResponse.json({ data, source });
   } catch (e: any) {
     return NextResponse.json({ data: null, source: null, error: e?.message }, { status: 200 });
   }

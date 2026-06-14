@@ -1,0 +1,34 @@
+[
+  {
+    "subject": "api.demo-org.internal",
+    "alg": "rsaEncryption",
+    "bits": 2048,
+    "expiry": 12,
+    "issuer": "Demo Org RSA CA",
+    "urgency": "renew"
+  },
+  {
+    "subject": "legacy.demo-org.internal",
+    "alg": "rsaEncryption",
+    "bits": 2048,
+    "expiry": 45,
+    "issuer": "Demo Org RSA CA",
+    "urgency": "plan"
+  },
+  {
+    "subject": "pqc-gateway.demo-org.internal",
+    "alg": "ML-DSA-65",
+    "bits": null,
+    "expiry": 365,
+    "issuer": "Demo Org PQC CA",
+    "urgency": "done"
+  },
+  {
+    "subject": "mobile.demo-org.internal",
+    "alg": "id-ecPublicKey",
+    "bits": 256,
+    "expiry": 180,
+    "issuer": "Demo Org ECC CA",
+    "urgency": "monitor"
+  }
+]

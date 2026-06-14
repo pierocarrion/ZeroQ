@@ -3,7 +3,8 @@ import React, { useState } from "react";
 import { useSplunkData } from "../client";
 import {
   TONE, riskTone, Icon, Panel, RiskPill, Tag, Delta, Gauge, Donut, AreaChart,
-  StackedBar, DataTable, StatTile, Bar, linkBtn,
+  StackedBar, DataTable, StatTile, Bar, linkBtn, Spinner,
+  SkeletonDashboard, SkeletonInventory, SkeletonCerts, SkeletonHndl,
 } from "../primitives";
 
 function SourceBadge({ source }) {
@@ -46,15 +47,17 @@ function HndlBanner({ onView }) {
 
 /* ---------------- Dashboard ---------------- */
 export function Dashboard({ go }) {
-  const { data: riskData, source } = useSplunkData("/api/risk");
+  const { data: riskData, source, loading: riskLoading } = useSplunkData("/api/risk");
   const s = riskData || { riskScore: 0, band: "—", lastMonth: 0, breakdown: [] };
   const legend = (s.breakdown || []).map((b) => ({ ...b, label: b.label || b.key, color: b.color || "var(--tx-dim)" }));
 
-  const { data: algoMix, source: algoSource } = useSplunkData("/api/algo-mix");
-  const { data: topAssets } = useSplunkData("/api/top-assets");
-  const { data: trends } = useSplunkData("/api/trends");
+  const { data: algoMix, source: algoSource, loading: algoLoading } = useSplunkData("/api/algo-mix");
+  const { data: topAssets, loading: assetsLoading } = useSplunkData("/api/top-assets");
+  const { data: trends, loading: trendsLoading } = useSplunkData("/api/trends");
 
-  const noData = source !== "splunk" && !riskData?.riskScore;
+  const loading = riskLoading || algoLoading || assetsLoading || trendsLoading;
+  const noData = !loading && source !== "splunk" && !riskData?.riskScore;
+  if (loading) return <SkeletonDashboard />;
   return (
     <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <HndlBanner onView={() => go("hndl")} />
@@ -143,21 +146,106 @@ export function Dashboard({ go }) {
   );
 }
 
+function AddDomainForm({ onDone }) {
+  const [host, setHost] = useState("");
+  const [port, setPort] = useState("443");
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState(null);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    const h = host.trim();
+    if (!h) return;
+    setLoading(true);
+    setStatus(null);
+    try {
+      const p = Number(port) || 443;
+      const add = await fetch("/api/domains", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ host: h, port: p }),
+      });
+      const addJson = await add.json();
+      if (!add.ok || !addJson.ok) throw new Error(addJson.error || "Failed to save domain");
+
+      const scan = await fetch("/api/scan-tls", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ host: h, port: p }),
+      });
+      const scanJson = await scan.json();
+      if (!scan.ok || !scanJson.ok) throw new Error(scanJson.error || "TLS scan failed");
+
+      setStatus({ ok: true, msg: `Scanned ${h}:${p}` });
+      setHost("");
+      setPort("443");
+      onDone?.();
+    } catch (err) {
+      setStatus({ ok: false, msg: err?.message || "Error" });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+        <input
+          value={host}
+          onChange={(e) => setHost(e.target.value)}
+          placeholder="example.com"
+          disabled={loading}
+          style={{ flex: 1, minWidth: 180, padding: "0 12px", height: 38, background: "var(--bg-0)", border: "1px solid var(--line)", borderRadius: 9, color: "var(--tx)", fontFamily: "var(--font)", fontSize: 13, outline: "none" }}
+        />
+        <input
+          value={port}
+          onChange={(e) => setPort(e.target.value)}
+          placeholder="443"
+          disabled={loading}
+          style={{ width: 80, padding: "0 12px", height: 38, background: "var(--bg-0)", border: "1px solid var(--line)", borderRadius: 9, color: "var(--tx)", fontFamily: "var(--font)", fontSize: 13, outline: "none" }}
+        />
+        <button type="submit" disabled={loading || !host.trim()} style={{ ...linkBtn, padding: "0 16px", height: 38, display: "inline-flex", alignItems: "center", gap: 7 }}>
+          {loading ? <Spinner size={14} /> : <Icon name="radar" size={14} />} Scan
+        </button>
+      </div>
+      {status && (
+        <div style={{ fontSize: 12, color: status.ok ? "var(--safe)" : "var(--crit)" }}>
+          {status.ok ? "✓ " : "✗ "}{status.msg}
+        </div>
+      )}
+    </form>
+  );
+}
+
 /* ---------------- Inventory ---------------- */
 export function Inventory() {
   const [risk, setRisk] = useState("all");
   const [q, setQ] = useState("");
-  const { data: liveRows, source } = useSplunkData("/api/inventory");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [showAddDomain, setShowAddDomain] = useState(false);
+  const { data: liveRows, source, loading } = useSplunkData("/api/inventory", [refreshKey]);
+  if (loading) return <SkeletonInventory />;
   if (liveRows === null) return (
     <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div className="card" style={{ padding: 40, textAlign: "center" }}>
         <div style={{ color: "var(--safe)", display: "flex", justifyContent: "center", marginBottom: 10 }}><Icon name="globe" size={32} /></div>
         <div style={{ fontSize: 15, fontWeight: 600, color: "var(--tx-hi)", marginBottom: 6 }}>No network inventory available</div>
         <div style={{ fontSize: 13.5, color: "var(--tx-mut)", maxWidth: 420, margin: "0 auto 16px", lineHeight: 1.5 }}>
-          TLS connection profiles are built from Zeek ssl.log data indexed in Splunk. Connect your instance to start monitoring.
+          TLS connection profiles are built from Zeek ssl.log data indexed in Splunk, or once you scan a domain below.
         </div>
-        <a href="/onboarding" style={{ ...linkBtn, padding: "9px 15px", background: "var(--brand)", color: "#fff", borderColor: "var(--brand)", textDecoration: "none", display: "inline-flex" }}>Connect Splunk</a>
+        <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+          <a href="/onboarding" style={{ ...linkBtn, padding: "9px 15px", background: "var(--brand)", color: "#fff", borderColor: "var(--brand)", textDecoration: "none", display: "inline-flex" }}>Connect Splunk</a>
+          <button onClick={() => setShowAddDomain((v) => !v)} style={{ ...linkBtn, padding: "9px 15px", display: "inline-flex", alignItems: "center", gap: 7 }}>
+            <Icon name="globe" size={14} /> Add domain
+          </button>
+        </div>
       </div>
+      {showAddDomain && (
+        <div className="card" style={{ padding: 20 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: "var(--tx-hi)", marginBottom: 12 }}>Add domain to scan</div>
+          <AddDomainForm onDone={() => setRefreshKey((k) => k + 1)} />
+        </div>
+      )}
     </div>
   );
   const all = liveRows || [];
@@ -184,11 +272,20 @@ export function Inventory() {
         </div>
         <div style={{ flex: 1 }} />
         <SourceBadge source={source} />
+        <button onClick={() => setShowAddDomain((v) => !v)} style={{ ...linkBtn, padding: "0 14px", height: 38, display: "inline-flex", alignItems: "center", gap: 7 }}>
+          <Icon name="globe" size={14} /> Add domain
+        </button>
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 12px", height: 38, background: "var(--bg-1)", border: "1px solid var(--line)", borderRadius: 10, width: 280 }}>
           <Icon name="search" size={15} style={{ color: "var(--tx-dim)" }} />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter by host, cipher, IP…" style={{ flex: 1, background: "none", border: "none", outline: "none", color: "var(--tx)", fontFamily: "var(--font)", fontSize: 13 }} />
         </div>
       </div>
+      {showAddDomain && (
+        <div className="card" style={{ padding: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--tx-hi)", marginBottom: 10 }}>Add domain to scan</div>
+          <AddDomainForm onDone={() => setRefreshKey((k) => k + 1)} />
+        </div>
+      )}
       <Panel pad={0} title="Live cipher & TLS inventory" subtitle={`${rows.length} connection profiles · sourced from zeek:ssl`}
         right={<span style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, color: "var(--tx-mut)" }}><span style={{ width: 7, height: 7, borderRadius: 999, background: "var(--safe)", animation: "pulse-dot 1.6s infinite" }} />streaming</span>}>
         <DataTable
@@ -224,7 +321,8 @@ const URGENCY = {
 };
 export function CertPlanner() {
   const [sort, setSort] = useState("expiry");
-  const { data: liveCerts, source } = useSplunkData("/api/certs");
+  const { data: liveCerts, source, loading } = useSplunkData("/api/certs");
+  if (loading) return <SkeletonCerts />;
   if (liveCerts === null) return (
     <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div className="card" style={{ padding: 40, textAlign: "center" }}>
@@ -315,11 +413,14 @@ export function CertPlanner() {
 /* ---------------- HNDL detection ---------------- */
 export function HndlDetect() {
   const [sel, setSel] = useState(0);
-  const { data: anomalies, source } = useSplunkData("/api/hndl");
-  const { data: timeline } = useSplunkData("/api/hndl/timeline");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [generating, setGenerating] = useState(false);
+  const { data: anomalies, source, loading: anomaliesLoading } = useSplunkData("/api/hndl", [refreshKey]);
+  const { data: timeline, loading: timelineLoading } = useSplunkData("/api/hndl/timeline", [refreshKey]);
   const list = anomalies || [];
   const a = list[sel] || list[0];
   const statusTone = (s) => (s === "active" ? "crit" : "warn");
+  if (anomaliesLoading || timelineLoading) return <SkeletonHndl />;
   if (list.length === 0) return (
     <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <div className="card" style={{ padding: 40, textAlign: "center" }}>
@@ -327,15 +428,35 @@ export function HndlDetect() {
         <div style={{ fontSize: 15, fontWeight: 600, color: "var(--tx-hi)", marginBottom: 6 }}>No HNDL anomalies detected</div>
         <div style={{ fontSize: 13.5, color: "var(--tx-mut)", maxWidth: 420, margin: "0 auto 16px", lineHeight: 1.5 }}>
           Harvest-Now-Decrypt-Later detection requires encrypted egress data indexed in Splunk.
+          In local demo mode you can generate synthetic anomalies from the TLS scans already stored.
         </div>
-        <a href="/onboarding" style={{ ...linkBtn, padding: "9px 15px", background: "var(--brand)", color: "#fff", borderColor: "var(--brand)", textDecoration: "none", display: "inline-flex" }}>Connect data sources</a>
+        <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+          <a href="/onboarding" style={{ ...linkBtn, padding: "9px 15px", background: "var(--brand)", color: "#fff", borderColor: "var(--brand)", textDecoration: "none", display: "inline-flex" }}>Connect data sources</a>
+          <button
+            onClick={async () => { setGenerating(true); try { await fetch("/api/hndl/generate", { method: "POST" }); setRefreshKey((k) => k + 1); } catch {} setGenerating(false); }}
+            disabled={generating}
+            style={{ ...linkBtn, padding: "9px 15px", display: "inline-flex", alignItems: "center", gap: 7 }}
+          >
+            {generating ? <Spinner size={14} /> : <Icon name="radar" size={14} />} Generate demo anomalies
+          </button>
+        </div>
       </div>
     </div>
   );
   return (
     <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <SourceBadge source={source} />
+        <div style={{ flex: 1 }} />
+        {source !== "splunk" && (
+          <button
+            onClick={async () => { setGenerating(true); try { await fetch("/api/hndl/generate", { method: "POST" }); setRefreshKey((k) => k + 1); } catch {} setGenerating(false); }}
+            disabled={generating}
+            style={{ ...linkBtn, padding: "0 14px", height: 34, display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12.5 }}
+          >
+            {generating ? <Spinner size={13} /> : <Icon name="radar" size={13} />} Regenerate demo
+          </button>
+        )}
       </div>
       <Panel title="Outbound encrypted volume · 48h" subtitle="Egress to external destinations · GB per hour"
         right={<div style={{ display: "flex", gap: 14, fontSize: 12, color: "var(--tx-mut)" }}>

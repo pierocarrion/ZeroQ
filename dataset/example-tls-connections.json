@@ -1,0 +1,54 @@
+[
+  {
+    "server": "api.demo-org.internal",
+    "src": "10.0.1.15",
+    "dst": "10.0.2.40:443",
+    "version": "TLS 1.3",
+    "cipher": "TLS_AES_256_GCM_SHA384",
+    "curve": "X25519MLKEM768",
+    "risk": "safe",
+    "hosts": 12,
+    "seen": "2m",
+    "sensitivity": "Tier-0",
+    "txns_day": "1.2M"
+  },
+  {
+    "server": "legacy.demo-org.internal",
+    "src": "10.0.3.8",
+    "dst": "10.0.4.12:443",
+    "version": "TLS 1.1",
+    "cipher": "TLS_RSA_WITH_AES_128_CBC_SHA",
+    "curve": "—",
+    "risk": "critical",
+    "hosts": 4,
+    "seen": "5m",
+    "sensitivity": "PCI",
+    "txns_day": "82k"
+  },
+  {
+    "server": "payments.demo-org.internal",
+    "src": "10.0.5.22",
+    "dst": "10.0.6.7:443",
+    "version": "TLS 1.2",
+    "cipher": "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+    "curve": "secp256r1",
+    "risk": "high",
+    "hosts": 8,
+    "seen": "1m",
+    "sensitivity": "Tier-0",
+    "txns_day": "450k"
+  },
+  {
+    "server": "collectors-ams.azureedge.net",
+    "src": "10.0.1.99",
+    "dst": "203.0.113.47:443",
+    "version": "TLS 1.2",
+    "cipher": "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
+    "curve": "secp256r1",
+    "risk": "high",
+    "hosts": 1,
+    "seen": "12m",
+    "sensitivity": "Unknown",
+    "txns_day": "—"
+  }
+]

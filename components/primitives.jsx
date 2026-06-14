@@ -195,7 +195,7 @@ export function Donut({ data, size = 150, thickness = 18 }) {
 
 export function AreaChart({ data, height = 120, color = "var(--brand)", highlight }) {
   const w = 600;
-  const sanitized = (Array.isArray(data) ? data : []).map((v) => (typeof v === "number" && !isNaN(v) ? v : 0));
+  let sanitized = (Array.isArray(data) ? data : []).map((v) => (typeof v === "number" && !isNaN(v) ? v : 0));
   if (sanitized.length === 0) {
     return (
       <svg width="100%" height={height + 22} viewBox={`0 0 ${w} ${height + 22}`} preserveAspectRatio="none">
@@ -204,6 +204,7 @@ export function AreaChart({ data, height = 120, color = "var(--brand)", highligh
       </svg>
     );
   }
+  if (sanitized.length === 1) sanitized = [sanitized[0], sanitized[0]];
   const max = Math.max(...sanitized) * 1.12;
   const min = Math.min(...sanitized, 0);
   const span = max - min || 1;
@@ -212,6 +213,7 @@ export function AreaChart({ data, height = 120, color = "var(--brand)", highligh
   const line = sanitized.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
   const area = `0,${height} ${line} ${w},${height}`;
   const gid = "area-" + Math.round(color.length * 7 + sanitized.length);
+  const validHighlight = Array.isArray(highlight) && highlight.length >= 2 && typeof highlight[0] === "number" && typeof highlight[1] === "number";
   return (
     <svg width="100%" height={height + 22} viewBox={`0 0 ${w} ${height + 22}`} preserveAspectRatio="none">
       <defs>
@@ -220,7 +222,7 @@ export function AreaChart({ data, height = 120, color = "var(--brand)", highligh
         </linearGradient>
       </defs>
       {[0.25, 0.5, 0.75].map((g) => <line key={g} x1="0" y1={height * g} x2={w} y2={height * g} stroke="#ffffff08" strokeWidth="1" />)}
-      {highlight && <rect x={x(highlight[0])} y="0" width={x(highlight[1]) - x(highlight[0])} height={height} fill="var(--crit)" opacity=".09" />}
+      {validHighlight && <rect x={x(highlight[0])} y="0" width={x(highlight[1]) - x(highlight[0])} height={height} fill="var(--crit)" opacity=".09" />}
       <polygon points={area} fill={`url(#${gid})`} />
       <polyline points={line} fill="none" stroke={color} strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round" />
       <circle cx={x(sanitized.length - 1)} cy={y(sanitized[sanitized.length - 1])} r="3.5" fill={color} />
@@ -340,3 +342,21 @@ export function MdLite({ text }) {
     </div>
   );
 }
+
+/* ---------------- Loading skeletons ---------------- */
+export {
+  Skeleton,
+  SkeletonCard,
+  SkeletonStat,
+  SkeletonTable,
+  SkeletonPlan,
+  SkeletonDashboard,
+  SkeletonInventory,
+  SkeletonCerts,
+  SkeletonHndl,
+  SkeletonRepos,
+  SkeletonRoadmap,
+  SkeletonCompliance,
+  SkeletonSettings,
+  SkeletonAssistant,
+} from "./Skeleton";

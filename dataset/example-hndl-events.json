@@ -1,0 +1,50 @@
+[
+  {
+    "dst": "collectors-ams.azureedge.net",
+    "asn": "AS8075",
+    "geo": "NL",
+    "volume": "142.3 GB",
+    "baseline": "12.1 GB",
+    "deviation": 11.8,
+    "sessions": 1240,
+    "window": "last 1h",
+    "status": "active",
+    "note": "Massive encrypted egress to a first-seen CDN endpoint. Volume spike correlates with off-hours activity."
+  },
+  {
+    "dst": "backup-ny.s3-external-1.amazonaws.com",
+    "asn": "AS16509",
+    "geo": "US",
+    "volume": "98.5 GB",
+    "baseline": "11.7 GB",
+    "deviation": 8.4,
+    "sessions": 892,
+    "window": "last 1h",
+    "status": "active",
+    "note": "Unusual S3 egress from a production subnet to a bucket never seen in the prior 30-day baseline."
+  },
+  {
+    "dst": "203.0.113.47",
+    "asn": "AS14061",
+    "geo": "SG",
+    "volume": "67.2 GB",
+    "baseline": "10.0 GB",
+    "deviation": 6.7,
+    "sessions": 560,
+    "window": "last 1h",
+    "status": "active",
+    "note": "Direct encrypted egress to an unfamiliar IP with no SNI. Baseline for this ASN is near zero."
+  },
+  {
+    "dst": "logs-eu1.datadoghq.com",
+    "asn": "AS14618",
+    "geo": "DE",
+    "volume": "29.4 GB",
+    "baseline": "7.0 GB",
+    "deviation": 4.2,
+    "sessions": 340,
+    "window": "last 1h",
+    "status": "watch",
+    "note": "Elevated TLS volume to a telemetry collector. Likely benign but worth correlating with change windows."
+  }
+]

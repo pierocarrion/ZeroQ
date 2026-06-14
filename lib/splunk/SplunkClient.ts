@@ -56,6 +56,19 @@ export interface HndlAnomaly {
   _time?: string;
 }
 
+export interface ComplianceControl {
+  id: string;
+  framework: string;
+  authority: string;
+  title: string;
+  description: string;
+  state: "passed" | "failed" | "partial";
+  score: number;
+  evaluated: number;
+  failures: number;
+  recommendation: string;
+}
+
 export interface ComplianceStat {
   framework: string;
   authority: string;
@@ -63,6 +76,15 @@ export interface ComplianceStat {
   progress: number;
   mapped: number;
   atRisk: number;
+  controls: ComplianceControl[];
+}
+
+export interface ComplianceSummary {
+  overallProgress: number;
+  totalControls: number;
+  passedControls: number;
+  atRiskAssets: number;
+  totalAssets: number;
 }
 
 export interface SplunkClient {

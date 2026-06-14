@@ -1,15 +1,16 @@
 "use client";
-import React, { useState, useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { TONE, Icon, Logo, Tag, iconBtn } from "./primitives";
-import { useSplunkData } from "./client";
+import { useSplunkData, useSplunkHealth } from "./client";
+import Loading from "./Loading";
 import { Dashboard, Inventory, CertPlanner, HndlDetect } from "./screens/Monitor";
 import { Repos, Agent } from "./screens/Source";
 import { Assistant, Roadmap, Compliance } from "./screens/Intel";
 import { OrgPlan, Architecture, Settings } from "./screens/Platform";
-import { apiRisk } from "./client";
 
-const NAV = [
+export const NAV = [
   { group: "Monitor", items: [
     { id: "dashboard", label: "Risk Dashboard", icon: "dashboard" },
     { id: "inventory", label: "Crypto Inventory", icon: "inventory" },
@@ -34,7 +35,7 @@ const NAV = [
   ]},
 ];
 
-const TITLES = {
+export const TITLES = {
   dashboard: ["Quantum Risk Dashboard", "Real-time ZeroQ posture across the network"],
   inventory: ["Crypto Inventory", "Every cipher suite & TLS profile observed on the wire"],
   certs: ["Certificate Migration Planner", "Quantum-vulnerable certificates ranked by expiry"],
@@ -49,7 +50,7 @@ const TITLES = {
   architecture: ["Architecture", "How the app runs on Splunk — install, configure, done"],
 };
 
-function Screen({ id, go }) {
+export function Screen({ id, go }) {
   switch (id) {
     case "dashboard": return <Dashboard go={go} />;
     case "inventory": return <Inventory />;
@@ -67,7 +68,7 @@ function Screen({ id, go }) {
   }
 }
 
-function Sidebar({ active, go, splunkLive }) {
+function Sidebar({ active, splunkLive }) {
   return (
     <aside style={{ width: 244, flexShrink: 0, background: "var(--bg-1)", borderRight: "1px solid var(--line)", display: "flex", flexDirection: "column", height: "100%" }}>
       <Link href="/" style={{ padding: "18px 18px 16px", display: "flex", alignItems: "center", gap: 11, borderBottom: "1px solid var(--line)", textDecoration: "none" }}>
@@ -85,11 +86,11 @@ function Sidebar({ active, go, splunkLive }) {
               {sec.items.map((it) => {
                 const on = active === it.id;
                 return (
-                  <button key={it.id} onClick={() => go(it.id)} className={"zeroq-nav-btn" + (on ? " active" : "")} style={{ display: "flex", alignItems: "center", gap: 11, padding: "9px 10px", borderRadius: 9, border: "none", cursor: "pointer", fontFamily: "var(--font)", fontSize: 13.5, fontWeight: 500, textAlign: "left", width: "100%", position: "relative", color: on ? "var(--tx-hi)" : "var(--tx-mut)" }}>
+                  <Link key={it.id} href={`/app/${it.id}`} className={"zeroq-nav-btn" + (on ? " active" : "")} style={{ display: "flex", alignItems: "center", gap: 11, padding: "9px 10px", borderRadius: 9, border: "none", cursor: "pointer", fontFamily: "var(--font)", fontSize: 13.5, fontWeight: 500, textAlign: "left", width: "100%", position: "relative", color: on ? "var(--tx-hi)" : "var(--tx-mut)", textDecoration: "none" }}>
                     <span style={{ color: on ? "var(--brand-2)" : "var(--tx-dim)", display: "flex" }}><Icon name={it.icon} size={17} fill={it.icon === "ai" ? "currentColor" : "none"} stroke={it.icon === "ai" ? 0 : 1.7} /></span>
                     <span style={{ flex: 1 }}>{it.label}</span>
                     {it.alert && <span style={{ width: 7, height: 7, borderRadius: 999, background: "var(--crit)", animation: "pulse-dot 1.6s infinite" }} />}
-                  </button>
+                  </Link>
                 );
               })}
             </div>
@@ -110,8 +111,8 @@ function Sidebar({ active, go, splunkLive }) {
         <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "10px 12px", background: "var(--bg-inset)", border: "1px solid var(--line)", borderRadius: 10 }}>
           <span style={{ width: 8, height: 8, borderRadius: 999, background: splunkLive ? "var(--safe)" : "var(--warn)", animation: splunkLive ? "pulse-dot 1.8s infinite" : "none", flexShrink: 0 }} />
           <div style={{ lineHeight: 1.3 }}>
-            <div style={{ fontSize: 12, color: "var(--tx)", fontWeight: 500 }}>{splunkLive ? "Splunk connected" : "Splunk offline"}</div>
-            <div style={{ fontSize: 11, color: "var(--tx-mut)" }}>{splunkLive ? "ingesting · search ready" : "seed data mode"}</div>
+            <div style={{ fontSize: 12, color: "var(--tx)", fontWeight: 500 }}>{splunkLive ? "Splunk connected" : "Local scans"}</div>
+            <div style={{ fontSize: 11, color: "var(--tx-mut)" }}>{splunkLive ? "ingesting · search ready" : "real repo + TLS scans"}</div>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 4px" }}>
@@ -124,7 +125,7 @@ function Sidebar({ active, go, splunkLive }) {
 }
 
 function Topbar({ active, splunkLive }) {
-  const [title, sub] = TITLES[active];
+  const [title, sub] = TITLES[active] || TITLES.dashboard;
   const { data: riskData } = useSplunkData("/api/risk");
   const riskScore = riskData?.riskScore ?? 0;
   const riskBand = riskData?.riskBand ?? "—";
@@ -156,43 +157,36 @@ function Topbar({ active, splunkLive }) {
   );
 }
 
-export default function AppShell() {
-  const [active, setActive] = useState("dashboard");
-  const [splunkLive, setSplunkLive] = useState(false);
+export default function AppShell({ children }) {
+  const pathname = usePathname();
+  const active = pathname?.split("/")[2] || "dashboard";
+  const validActive = TITLES[active] ? active : "dashboard";
+  const { connected: splunkLive, loading: healthLoading } = useSplunkHealth();
+  const [booted, setBooted] = useState(false);
   const scrollRef = useRef(null);
-  const go = (id) => {
-    setActive(id);
-    try { localStorage.setItem("zeroq.screen", id); } catch {}
-  };
+
   useEffect(() => {
-    try { const s = localStorage.getItem("zeroq.screen"); if (s && TITLES[s]) setActive(s); } catch {}
-  }, []);
-  useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 0; }, [active]);
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [pathname]);
+
   useEffect(() => {
-    let mounted = true;
-    async function checkHealth() {
-      try {
-        const res = await fetch("/api/health/splunk", { cache: "no-store" });
-        const d = await res.json();
-        if (mounted) setSplunkLive(!!d?.connected);
-      } catch {
-        if (mounted) setSplunkLive(false);
-      }
-    }
-    checkHealth();
-    const interval = setInterval(checkHealth, 30_000);
-    return () => { mounted = false; clearInterval(interval); };
-  }, []);
-  const fullHeight = active === "assistant";
+    if (!healthLoading) { setBooted(true); return; }
+    const t = setTimeout(() => setBooted(true), 3000);
+    return () => clearTimeout(t);
+  }, [healthLoading]);
+
+  if (!booted) return <Loading />;
+
+  const fullHeight = validActive === "assistant";
 
   return (
     <div style={{ display: "flex", height: "100vh", background: "var(--bg-0)" }}>
-      <Sidebar active={active} go={go} splunkLive={splunkLive} />
+      <Sidebar active={validActive} splunkLive={splunkLive} />
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", height: "100%" }}>
-        <Topbar active={active} splunkLive={splunkLive} />
+        <Topbar active={validActive} splunkLive={splunkLive} />
         <main ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 26, display: "flex", flexDirection: "column" }}>
-          <div key={active} style={{ flex: fullHeight ? 1 : "none", minHeight: 0, display: "flex", flexDirection: "column" }}>
-            <Screen id={active} go={go} />
+          <div key={pathname} style={{ flex: fullHeight ? 1 : "none", minHeight: 0, display: "flex", flexDirection: "column" }}>
+            {children}
           </div>
         </main>
       </div>

@@ -18,10 +18,11 @@ export class AssistantService {
   constructor(
     private readonly ai: AIProvider,
     private readonly splunk: SplunkClient,
+    private readonly localStore: SplunkClient,
   ) {}
 
   async ask(messages: AssistantMessage[], scanned: ScanResult[]): Promise<AssistantReply> {
-    const context = await buildPostureContext(scanned, { splunk: this.splunk });
+    const context = await buildPostureContext(scanned, { splunk: this.splunk, localStore: this.localStore });
     const system = `${SYSTEM}\n\nCONTEXT:\n${context}`;
     const text = await this.ai.complete({ system, messages });
     return { text, mode: this.ai.live ? "live" : "fallback" };

@@ -1,23 +1,46 @@
 // ============================================================
 // services/PostureContext.ts — builds the grounded context the
-// assistant reasons over. Uses Splunk live data when available.
+// assistant reasons over. Prefers Splunk live data, but always
+// falls back to the local SQLite store so the assistant works
+// offline and local scans are always visible.
 // ============================================================
-import type { ScanResult } from "../types";
+import type { ScanResult, RepoSeed } from "../types";
 import type { SplunkClient } from "../splunk/SplunkClient";
 
 export interface PostureContextOpts {
   splunk?: SplunkClient;
+  localStore?: SplunkClient;
+}
+
+function useful<T>(value: T | null | undefined): value is T {
+  if (value == null) return false;
+  if (Array.isArray(value) && value.length === 0) return false;
+  if (typeof value === "object" && "riskScore" in value && (value as any).riskScore === 0 && ((value as any).endpointsScanned ?? 0) === 0) return false;
+  return true;
 }
 
 export async function buildPostureContext(scanned: ScanResult[], opts: PostureContextOpts = {}): Promise<string> {
   const splunk = opts.splunk && opts.splunk.enabled ? opts.splunk : null;
+  const local = opts.localStore && opts.localStore.enabled ? opts.localStore : null;
 
-  const [riskSummary, inventory, certs, algoMix] = await Promise.all([
+  const [splunkRisk, splunkInventory, splunkCerts, splunkAlgoMix] = await Promise.all([
     splunk?.getRiskSummary(),
     splunk?.getInventory(),
     splunk?.getCertificates(),
     splunk?.getAlgoMix(),
   ]);
+
+  const [localRisk, localInventory, localCerts, localAlgoMix] = await Promise.all([
+    local?.getRiskSummary(),
+    local?.getInventory(),
+    local?.getCertificates(),
+    local?.getAlgoMix(),
+  ]);
+
+  const riskSummary = useful(splunkRisk) ? splunkRisk : useful(localRisk) ? localRisk : null;
+  const inventory = useful(splunkInventory) ? splunkInventory : useful(localInventory) ? localInventory : [];
+  const certs = useful(splunkCerts) ? splunkCerts : useful(localCerts) ? localCerts : [];
+  const algoMix = useful(splunkAlgoMix) ? splunkAlgoMix : useful(localAlgoMix) ? localAlgoMix : [];
 
   const summary = riskSummary
     ? {
@@ -29,25 +52,32 @@ export async function buildPostureContext(scanned: ScanResult[], opts: PostureCo
       }
     : { riskScore: 0, riskBand: "—", endpointsScanned: 0, coverage: 0, connectionsObserved: 0 };
 
-  const liveInventory = inventory && inventory.length > 0 ? inventory : [];
-  const liveCerts = certs && certs.length > 0 ? certs : [];
-  const liveAlgoMix = algoMix && algoMix.length > 0 ? algoMix : [];
-
   const tally: Record<string, number> = {};
-  liveInventory.forEach((r) => { tally[r.risk] = (tally[r.risk] ?? 0) + 1; });
+  inventory.forEach((r) => { tally[r.risk] = (tally[r.risk] ?? 0) + 1; });
 
-  const criticalEndpoints = liveInventory
+  const criticalEndpoints = inventory
     .filter((r) => r.risk === "critical")
     .map((r) => `${r.server} [${r.version} ${r.cipher}]`)
     .slice(0, 8);
 
-  const expiringCerts = liveCerts
+  const expiringCerts = certs
     .filter((c) => c.expiry < 90)
     .map((c) => `${c.subject} (${c.alg === "rsaEncryption" ? "RSA-" + c.bits : c.alg}, ${c.expiry}d)`);
 
-  const scannedSummary = scanned.length
+  let scannedSummary = scanned.length
     ? scanned.map((x) => `${x.repo} — grade ${x.grade}, ${x.findings} findings (${x.critical} critical), risk ${x.risk}/100; top: ${x.detail.slice(0, 4).map((f) => `${f.kind} @ ${f.file}:${f.line}`).join("; ")}`).join("\n")
-    : "none yet (user can live-scan a public repo in Repository Scanner)";
+    : "";
+
+  if (!scannedSummary && local) {
+    const localRepos = await local.getRepos();
+    if (localRepos && localRepos.length > 0) {
+      scannedSummary = localRepos.map((x: RepoSeed) => `${x.repo} — grade ${x.grade}, ${x.findings} findings (${x.critical} critical/${x.high} high), language ${x.lang}; top: ${(x.detail || []).slice(0, 4).map((f) => `${f.kind} @ ${f.file}:${f.line}`).join("; ")}`).join("\n");
+    }
+  }
+
+  if (!scannedSummary) {
+    scannedSummary = "none yet (user can live-scan a public repo in Repository Scanner)";
+  }
 
   return [
     `QUANTUM RISK SCORE: ${summary.riskScore}/100 (${summary.riskBand}), was 0 last month.`,
@@ -55,7 +85,7 @@ export async function buildPostureContext(scanned: ScanResult[], opts: PostureCo
     `CONNECTION PROFILES BY TIER: critical ${tally.critical ?? 0}, high ${tally.high ?? 0}, monitor ${tally.monitor ?? 0}, safe ${tally.safe ?? 0}.`,
     `CRITICAL TLS ENDPOINTS (RSA / legacy): ${criticalEndpoints.join("; ") || "none detected"}.`,
     `CERTS EXPIRING <90d: ${expiringCerts.join("; ") || "none detected"}.`,
-    `ALGO MIX: ${liveAlgoMix.map((a) => a.algo + " " + a.pct + "%").join(", ") || "no data"}.`,
+    `ALGO MIX: ${algoMix.map((a) => a.algo + " " + a.pct + "%").join(", ") || "no data"}.`,
     `LIVE-SCANNED REPOS:\n${scannedSummary}`,
     `COMPLIANCE: NIST IR 8547 (RSA/ECDSA deprecated 2030, disallowed 2035), NSA CNSA 2.0 (PQC default 2030), CISA roadmap.`,
   ].join("\n");

@@ -1,46 +1,54 @@
 import { NextResponse } from "next/server";
-import { capabilities } from "@/lib/config";
-import { createSplunkClient } from "@/lib/splunk/splunkFactory";
+import { getRiskSummary } from "@/lib/services/dataSource";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// GET /api/risk — top-line posture + capability status (health check)
+// GET /api/risk — top-line posture from Splunk (if it has data) or local SQLite.
 export async function GET() {
   try {
-    const caps = capabilities();
-    let source: string | null = null;
-    const summary: {
-      riskScore: number;
-      band: string;
-      lastMonth: number;
-      breakdown: { key: string; value: number }[];
-    } = {
-      riskScore: 0,
-      band: "—",
-      lastMonth: 0,
-      breakdown: [],
-    };
-
-    if (caps.splunk) {
-      const live = await createSplunkClient().getRiskSummary();
-      if (live) {
-        summary.riskScore = live.riskScore;
-        summary.band = live.riskBand;
-        summary.lastMonth = live.lastMonthScore ?? 0;
-        summary.breakdown = live.breakdown;
-        source = "splunk";
-      }
+    const { data, source } = await getRiskSummary();
+    console.log("[api/risk] source:", source, "riskScore:", data?.riskScore);
+    if (data) {
+      return NextResponse.json({
+        data: {
+          riskScore: data.riskScore,
+          band: data.riskBand,
+          lastMonth: data.lastMonthScore ?? 0,
+          breakdown: data.breakdown,
+          endpointsScanned: data.endpointsScanned ?? 0,
+          connectionsObserved: data.connectionsObserved ?? 0,
+          certsTracked: data.certsTracked ?? 0,
+          coverage: data.coverage ?? 0,
+        },
+        source,
+      });
     }
-
-    return NextResponse.json({ ...summary, capabilities: caps, source });
+    return NextResponse.json({
+      data: {
+        riskScore: 0,
+        band: "—",
+        lastMonth: 0,
+        breakdown: [],
+        endpointsScanned: 0,
+        connectionsObserved: 0,
+        certsTracked: 0,
+        coverage: 0,
+      },
+      source: null,
+    });
   } catch (e: any) {
     return NextResponse.json({
-      riskScore: 0,
-      band: "—",
-      lastMonth: 0,
-      breakdown: [],
-      capabilities: capabilities(),
+      data: {
+        riskScore: 0,
+        band: "—",
+        lastMonth: 0,
+        breakdown: [],
+        endpointsScanned: 0,
+        connectionsObserved: 0,
+        certsTracked: 0,
+        coverage: 0,
+      },
       source: null,
       error: e?.message,
     });

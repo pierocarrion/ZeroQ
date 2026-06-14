@@ -40,6 +40,7 @@ export class SplunkSearchClient {
   }
 
   async query(search: string, opts: SplunkQueryOptions = {}): Promise<SplunkSearchResult> {
+    console.log("[SplunkSearchClient:query] enabled:", this.enabled, "search:", search.slice(0, 120));
     if (!this.enabled) return { fields: [], results: [] };
 
     const cacheKey = `${search}::${opts.earliest || ""}::${opts.latest || ""}::${opts.maxCount || 0}`;
@@ -48,8 +49,10 @@ export class SplunkSearchClient {
 
     try {
       const sid = await this.createJob(search, opts);
+      console.log("[SplunkSearchClient:query] job sid:", sid);
       await this.waitForJob(sid);
       const data = await this.readResults(sid, opts.maxCount);
+      console.log("[SplunkSearchClient:query] results:", data.results.length);
       this.cache.set(cacheKey, { ts: Date.now(), data });
       return data;
     } catch (e: any) {

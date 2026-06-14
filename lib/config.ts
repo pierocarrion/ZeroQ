@@ -1,11 +1,32 @@
 // ============================================================
 // config.ts — single source of truth for environment access.
-// Nothing else in the codebase reads process.env directly.
+// Values are read from the local SQLite database first, with
+// process.env as a fallback. This allows runtime config changes
+// without restarting the dev server.
 // ============================================================
+import { getSetting } from "./db/settings";
 
-function str(key: string): string | undefined {
+function env(key: string): string | undefined {
   const v = process.env[key];
   return v && v.trim() !== "" ? v.trim() : undefined;
+}
+
+function setting(key: string): string | undefined {
+  try {
+    return getSetting(key);
+  } catch {
+    return undefined;
+  }
+}
+
+
+function str(key: string): string | undefined {
+  return setting(key) ?? env(key);
+}
+
+function bool(key: string): boolean {
+  const v = str(key);
+  return v === "true" || v === "1";
 }
 
 export const config = {
@@ -31,7 +52,7 @@ export const config = {
     baseUrl: str("SPLUNK_BASE_URL"),
     username: str("SPLUNK_USERNAME"),
     password: str("SPLUNK_PASSWORD"),
-    skipTlsVerify: str("SPLUNK_SKIP_TLS_VERIFY") === "true",
+    skipTlsVerify: bool("SPLUNK_SKIP_TLS_VERIFY"),
     indexes: {
       net: str("SPLUNK_INDEX_NET") ?? "crypto_net",
       pki: str("SPLUNK_INDEX_PKI") ?? "crypto_pki",
@@ -61,4 +82,24 @@ export function capabilities(): Capabilities {
     github: !!config.github.token,
     gitlab: !!config.gitlab.token,
   };
+}
+
+// Log sanitized config at load time to aid debugging (skip during static build).
+if (typeof window !== "undefined" || process.env.NEXT_PHASE !== "phase-production-build") {
+  console.log("[config] loaded", {
+    ai: { enabled: config.ai.enabled, provider: config.ai.provider, model: config.ai.model },
+    github: { org: config.github.org, hasToken: !!config.github.token },
+    gitlab: { hasToken: !!config.gitlab.token },
+    splunk: {
+      enabled: config.splunk.enabled,
+      hecEnabled: config.splunk.hecEnabled,
+      searchEnabled: config.splunk.searchEnabled,
+      baseUrl: config.splunk.baseUrl,
+      hecUrl: config.splunk.hecUrl,
+      hasPassword: !!config.splunk.password,
+      skipTlsVerify: config.splunk.skipTlsVerify,
+      indexes: config.splunk.indexes,
+    },
+    scan: config.scan,
+  });
 }

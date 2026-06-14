@@ -1,0 +1,104 @@
+  ▲ Next.js 14.2.5
+  - Local:        http://localhost:3000
+
+ ✓ Starting...
+ ✓ Ready in 437ms
+[config] loaded {
+  ai: { enabled: true, provider: 'local', model: 'deepseek-chat' },
+  github: { org: '', hasToken: false },
+  gitlab: { hasToken: false },
+  splunk: {
+    enabled: true,
+    hecEnabled: true,
+    searchEnabled: true,
+    baseUrl: 'https://localhost:8089',
+    hecUrl: 'https://localhost:8088',
+    hasPassword: true,
+    skipTlsVerify: true,
+    indexes: {
+      net: 'crypto_net',
+      pki: 'crypto_pki',
+      hndl: 'crypto_hndl',
+      plan: 'crypto_plan'
+    }
+  },
+  scan: { maxFiles: 80 }
+}
+[api/health/splunk] client.enabled: true
+[api/health/splunk] REST check: true 200
+[api/health/splunk] client.enabled: true
+[api/health/splunk] REST check: true 200
+[dataSource:getRiskSummary] splunk.enabled: true
+[HecSplunkClient:getRiskSummary] search.enabled: true
+[SplunkSearchClient:query] enabled: true search: index=crypto_source sourcetype=zeroq:crypto_finding source!="zeroq:seed" earliest=-30d | spath input=_raw | dedup _raw |
+[SplunkSearchClient:query] enabled: true search: index=crypto_net sourcetype=zeroq:tls_connection source!="zeroq:seed" earliest=-7d | spath input=_raw | dedup _raw | sta
+[SplunkSearchClient:query] enabled: true search: index=crypto_pki sourcetype=zeroq:cert source!="zeroq:seed" | spath input=_raw | dedup _raw | stats count by urgency
+[SplunkSearchClient:query] enabled: true search: index=crypto_net sourcetype=zeroq:tls_connection source!="zeroq:seed" earliest=-7d | spath input=_raw | dedup _raw | sta
+[SplunkSearchClient:query] job sid: 1781375620.1533
+[SplunkSearchClient:query] job sid: 1781375620.1535
+[SplunkSearchClient:query] job sid: 1781375620.1536
+[SplunkSearchClient:query] job sid: 1781375620.1534
+[SplunkSearchClient:query] results: 0
+[SplunkSearchClient:query] results: 0
+[SplunkSearchClient:query] results: 1
+[SplunkSearchClient:query] results: 0
+[HecSplunkClient:getRiskSummary] counts: { critical: 0, high: 0, monitor: 0, safe: 0, endpointsScanned: '0' }
+[dataSource:getRiskSummary] splunk result: { riskScore: 0, endpointsScanned: 0 }
+[dataSource:getRiskSummary] local fallback: { riskScore: 76 }
+[api/risk] source: local riskScore: 76
+[SplunkSearchClient:query] enabled: true search: index=crypto_source sourcetype=zeroq:crypto_finding source!="zeroq:seed" earliest=-30d | spath input=_raw | dedup _raw |
+[SplunkSearchClient:query] job sid: 1781375620.1537
+[SplunkSearchClient:query] results: 0
+[SplunkSearchClient:query] enabled: true search: index=crypto_net sourcetype=zeroq:tls_connection source!="zeroq:seed" earliest=-7d | spath input=_raw | dedup _raw | sor
+[SplunkSearchClient:query] job sid: 1781375621.1538
+[SplunkSearchClient:query] results: 0
+[dataSource:getInventory] splunk rows: 0 filters: { risk: undefined, version: undefined, cipher: undefined }
+[dataSource:getInventory] local rows: 1
+[api/inventory] source: local rows: 1
+[SplunkSearchClient:query] enabled: true search: index=crypto_pki sourcetype=zeroq:cert source!="zeroq:seed" | spath input=_raw | dedup _raw | eval expiry=tonumber(mvind
+[SplunkSearchClient:query] job sid: 1781375622.1539
+[SplunkSearchClient:query] results: 0
+[dataSource:getCertificates] splunk rows: 0
+[dataSource:getCertificates] local rows: 1
+[api/certs] source: local rows: 1
+[SplunkSearchClient:query] enabled: true search: index=crypto_source sourcetype=zeroq:crypto_finding source!="zeroq:seed" earliest=-90d | spath input=_raw | dedup _raw |
+[SplunkSearchClient:query] job sid: 1781375622.1540
+[SplunkSearchClient:query] results: 0
+[SplunkSearchClient:query] enabled: true search: index=crypto_plan sourcetype=zeroq:roadmap source!="zeroq:seed" | spath input=_raw | dedup _raw | sort phase, item_order
+[SplunkSearchClient:query] job sid: 1781375623.1541
+[SplunkSearchClient:query] results: 0
+[HecSplunkClient:getRiskSummary] search.enabled: true
+[SplunkSearchClient:query] enabled: true search: index=crypto_source sourcetype=zeroq:crypto_finding source!="zeroq:seed" earliest=-30d | spath input=_raw | dedup _raw |
+[SplunkSearchClient:query] enabled: true search: index=crypto_net sourcetype=zeroq:tls_connection source!="zeroq:seed" earliest=-7d | spath input=_raw | dedup _raw | sta
+[SplunkSearchClient:query] enabled: true search: index=crypto_pki sourcetype=zeroq:cert source!="zeroq:seed" | spath input=_raw | dedup _raw | stats count by urgency
+[SplunkSearchClient:query] enabled: true search: index=crypto_net sourcetype=zeroq:tls_connection source!="zeroq:seed" earliest=-7d | spath input=_raw | dedup _raw | sta
+[SplunkSearchClient:query] enabled: true search: index=crypto_net sourcetype=zeroq:tls_connection source!="zeroq:seed" earliest=-7d | spath input=_raw | dedup _raw | sor
+[SplunkSearchClient:query] enabled: true search: index=crypto_pki sourcetype=zeroq:cert source!="zeroq:seed" | spath input=_raw | dedup _raw | eval expiry=tonumber(mvind
+[SplunkSearchClient:query] enabled: true search: index=crypto_net sourcetype=zeroq:tls_connection source!="zeroq:seed" earliest=-7d | spath input=_raw | dedup _raw | eva
+[SplunkSearchClient:query] job sid: 1781375624.1548
+[SplunkSearchClient:query] job sid: 1781375624.1547
+[SplunkSearchClient:query] job sid: 1781375624.1545
+[SplunkSearchClient:query] job sid: 1781375624.1542
+[SplunkSearchClient:query] job sid: 1781375624.1546
+[SplunkSearchClient:query] job sid: 1781375624.1544
+[SplunkSearchClient:query] job sid: 1781375624.1543
+[SplunkSearchClient:query] results: 0
+[SplunkSearchClient:query] results: 0
+[SplunkSearchClient:query] results: 0
+[SplunkSearchClient:query] results: 0
+[SplunkSearchClient:query] results: 0
+[SplunkSearchClient:query] results: 0
+[SplunkSearchClient:query] results: 1
+[HecSplunkClient:getRiskSummary] counts: { critical: 0, high: 0, monitor: 0, safe: 0, endpointsScanned: '0' }
+[SplunkSearchClient:query] enabled: true search: index=crypto_source sourcetype=zeroq:crypto_finding source!="zeroq:seed" earliest=-30d | spath input=_raw | dedup _raw |
+[SplunkSearchClient:query] enabled: true search: index=crypto_source sourcetype=zeroq:crypto_finding source!="zeroq:seed" earliest=-30d | spath input=_raw | dedup _raw |
+[SplunkSearchClient:query] enabled: true search: index=crypto_source sourcetype=zeroq:crypto_finding source!="zeroq:seed" earliest=-30d | spath input=_raw | dedup _raw |
+[SplunkSearchClient:query] job sid: 1781375627.1549
+[SplunkSearchClient:query] job sid: 1781375627.1550
+[SplunkSearchClient:query] job sid: 1781375627.1551
+[SplunkSearchClient:query] results: 1
+[SplunkSearchClient:query] results: 0
+[SplunkSearchClient:query] results: 0
+[scan] target: openssl/openssl
+[HecSplunkClient:sendFindings] repo: openssl/openssl findings: 12
+[scan] success: openssl/openssl findings: 12

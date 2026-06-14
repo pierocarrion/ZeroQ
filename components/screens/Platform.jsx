@@ -1,41 +1,75 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { TONE, Icon, Panel, Tag, GradeBadge, Spinner, linkBtn } from "../primitives";
+import {
+  TONE, Icon, Panel, Tag, GradeBadge, Spinner, linkBtn,
+  SkeletonPlan, SkeletonSettings,
+} from "../primitives";
 import AgentConsole from "../AgentConsole";
 import { apiPlan, useScannedRepos, useSplunkData } from "../client";
 
 /* ---------------- Org Security Plan (real /api/plan) ---------------- */
 export function OrgPlan({ go }) {
   const scanned = useScannedRepos();
+  const { data: liveRepos, loading: reposLoading } = useSplunkData("/api/repos");
+  const allScanned = scanned.length > 0 ? scanned : (liveRepos || []);
   const [ready, setReady] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [timedOut, setTimedOut] = useState(false);
   const [plan, setPlan] = useState({ org: "—", generated: "—", summary: "", posture: "—", targetPosture: "A", weeks: 0, streams: [] });
   const [mode, setMode] = useState(null);
-  const { data: orgPlan } = useSplunkData("/api/org-plan");
-  const { data: rollup } = useSplunkData("/api/code-rollup");
+  const { data: orgPlan, loading: orgPlanLoading } = useSplunkData("/api/org-plan");
+  const { data: rollup, loading: rollupLoading } = useSplunkData("/api/code-rollup");
   const basePlan = orgPlan;
   const r = rollup || {};
 
   const onAgentDone = async () => {
+    setGenerating(true);
     try {
-      const data = await apiPlan(scanned, scanned[0]?.owner || "acme-corp");
+      const data = await apiPlan(allScanned, allScanned[0]?.owner || "acme-corp", { timeout: 25_000 });
       if (data?.plan) setPlan(data.plan);
       setMode(data?.mode);
-    } catch { /* keep fallback */ }
-    setReady(true);
+      setTimedOut(false);
+    } catch (e) {
+      setTimedOut(true);
+    } finally {
+      setGenerating(false);
+      setReady(true);
+    }
   };
+
+  if (reposLoading || orgPlanLoading || rollupLoading) {
+    return (
+      <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <AgentConsole steps={[]} title="Generating org security plan"
+          subtitle={`${allScanned[0]?.owner || "org"} · ${allScanned.length ? allScanned.length + " scanned repo" + (allScanned.length > 1 ? "s" : "") : "no repos scanned yet"} · MCP Server + hosted model`}
+          onDone={onAgentDone} />
+        <SkeletonPlan />
+      </div>
+    );
+  }
 
   return (
     <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <AgentConsole steps={[]} title="Generating org security plan"
-        subtitle={`${scanned[0]?.owner || "org"} · ${scanned.length ? scanned.length + " live-scanned repos" : "no repos scanned yet"} · MCP Server + hosted model`}
+        subtitle={`${allScanned[0]?.owner || "org"} · ${allScanned.length ? allScanned.length + " scanned repo" + (allScanned.length > 1 ? "s" : "") : "no repos scanned yet"} · MCP Server + hosted model`}
         onDone={onAgentDone} />
 
-      {!ready ? (
+      {generating && <SkeletonPlan />}
+
+      {!generating && !ready && (
         <div className="card" style={{ padding: 30, textAlign: "center", color: "var(--tx-mut)", fontSize: 13.5 }}>
           The agent is analyzing your organization. The prioritized plan appears here when it finishes.
         </div>
-      ) : (
+      )}
+
+      {ready && (
         <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {timedOut && (
+            <div className="card" style={{ padding: 14, display: "flex", alignItems: "center", gap: 10, background: "var(--warn-bg)", borderColor: "var(--warn-line)" }}>
+              <Icon name="alert" size={18} style={{ color: "var(--warn)" }} />
+              <span style={{ fontSize: 13, color: "var(--tx)" }}>The AI plan request timed out. Showing an auto-prioritized fallback based on your scan data.</span>
+            </div>
+          )}
           <div className="card" style={{ padding: 20, display: "flex", gap: 16, alignItems: "flex-start", background: "linear-gradient(110deg, #131229, #0e1320 60%)", borderColor: "var(--brand-dim)" }}>
             <div style={{ width: 40, height: 40, borderRadius: 11, background: "var(--brand-dim)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--brand-2)" }}><Icon name="ai" size={21} fill="currentColor" stroke={0} /></div>
             <div style={{ flex: 1 }}>
@@ -224,12 +258,14 @@ export function Settings() {
 
   const [repos, setRepos] = useState([]);
   const [reposLoading, setReposLoading] = useState(false);
+  const [configLoading, setConfigLoading] = useState(true);
   const [selected, setSelected] = useState(new Set());
   const [savingRepos, setSavingRepos] = useState(false);
   const [scanningRepos, setScanningRepos] = useState(false);
   const [scanSummary, setScanSummary] = useState(null);
 
   useEffect(() => {
+    setConfigLoading(true);
     fetch("/api/onboarding/config")
       .then((res) => res.json())
       .then((data) => {
@@ -248,7 +284,8 @@ export function Settings() {
         }));
         if (Array.isArray(data.selectedRepos)) setSelected(new Set(data.selectedRepos));
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setConfigLoading(false));
   }, []);
 
   useEffect(() => {
@@ -361,6 +398,8 @@ export function Settings() {
     padding: "0 14px", height: 40, background: "var(--bg-inset)", border: "1px solid var(--line)",
     borderRadius: 10, color: "var(--tx)", fontFamily: "var(--font)", fontSize: 13, outline: "none", width: "100%",
   };
+
+  if (configLoading) return <SkeletonSettings />;
 
   return (
     <div className="fade-up" style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 800 }}>
@@ -485,6 +524,15 @@ export function Settings() {
         )}
       </div>
 
+      <div className="card" style={{ padding: 22 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
+          <span style={{ color: "var(--brand-2)" }}><Icon name="radar" size={20} /></span>
+          <span style={{ fontWeight: 600, color: "var(--tx-hi)", fontSize: 15 }}>Network sources</span>
+          <span style={{ fontSize: 12, color: "var(--tx-mut)" }}>Only scan infrastructure you own</span>
+        </div>
+        <DomainManager />
+      </div>
+
       <div className="card" style={{ padding: 18 }}>
         <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--tx-hi)", marginBottom: 10 }}>Ingestion guides</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -500,6 +548,99 @@ export function Settings() {
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ---------------- Domain Manager ---------------- */
+function DomainManager() {
+  const [domains, setDomains] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [host, setHost] = useState("");
+  const [port, setPort] = useState("443");
+  const [sensitivity, setSensitivity] = useState("");
+  const [txns, setTxns] = useState("");
+
+  async function load() {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/domains");
+      const data = await res.json();
+      setDomains(data.data || []);
+    } catch {}
+    setLoading(false);
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function add(e) {
+    e.preventDefault();
+    if (!host.trim()) return;
+    try {
+      await fetch("/api/domains", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ host: host.trim(), port: Number(port) || 443, sensitivity, txnsDay: txns }),
+      });
+      setHost(""); setPort("443"); setSensitivity(""); setTxns("");
+      load();
+    } catch {}
+  }
+
+  async function remove(id) {
+    try {
+      await fetch(`/api/domains?id=${id}`, { method: "DELETE" });
+      load();
+    } catch {}
+  }
+
+  async function scanAll() {
+    setScanning(true);
+    try {
+      await fetch("/api/scan-tls", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+      load();
+    } catch {}
+    setScanning(false);
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <form onSubmit={add} style={{ display: "grid", gridTemplateColumns: "1.5fr 80px 1fr 1fr auto", gap: 10, alignItems: "center" }}>
+        <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="your-domain.com or IP" style={{ padding: "0 12px", height: 38, background: "var(--bg-inset)", border: "1px solid var(--line)", borderRadius: 9, color: "var(--tx)", fontSize: 13 }} />
+        <input value={port} onChange={(e) => setPort(e.target.value)} placeholder="443" style={{ padding: "0 12px", height: 38, background: "var(--bg-inset)", border: "1px solid var(--line)", borderRadius: 9, color: "var(--tx)", fontSize: 13 }} />
+        <input value={sensitivity} onChange={(e) => setSensitivity(e.target.value)} placeholder="e.g. PCI · Tier-0" style={{ padding: "0 12px", height: 38, background: "var(--bg-inset)", border: "1px solid var(--line)", borderRadius: 9, color: "var(--tx)", fontSize: 13 }} />
+        <input value={txns} onChange={(e) => setTxns(e.target.value)} placeholder="e.g. 41.2k/day" style={{ padding: "0 12px", height: 38, background: "var(--bg-inset)", border: "1px solid var(--line)", borderRadius: 9, color: "var(--tx)", fontSize: 13 }} />
+        <button type="submit" style={{ ...linkBtn, padding: "0 14px", height: 38 }}>Add</button>
+      </form>
+
+      {loading && <div style={{ color: "var(--tx-mut)", fontSize: 13 }}><Spinner size={14} /> Loading domains…</div>}
+
+      {!loading && domains.length === 0 && (
+        <div style={{ fontSize: 13, color: "var(--tx-mut)", padding: "10px 0" }}>
+          No domains configured. Add your own hosts above to scan their TLS configuration and certificates.
+        </div>
+      )}
+
+      {!loading && domains.length > 0 && (
+        <>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 240, overflowY: "auto", border: "1px solid var(--line)", borderRadius: 10, padding: 8 }}>
+            {domains.map((d) => (
+              <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, background: "var(--bg-inset)" }}>
+                <span className="mono" style={{ fontSize: 13, color: "var(--tx-hi)", flex: 1 }}>{d.host}:{d.port}</span>
+                <span style={{ fontSize: 12, color: "var(--tx-mut)" }}>{d.sensitivity || "—"}</span>
+                <span style={{ fontSize: 12, color: "var(--tx-mut)" }}>{d.txns_day || "—"}</span>
+                <button onClick={() => remove(d.id)} style={{ ...linkBtn, padding: "4px 10px", fontSize: 12 }}>Remove</button>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={scanAll} disabled={scanning} style={{ ...linkBtn, padding: "10px 18px", background: "var(--brand)", color: "#fff", borderColor: "var(--brand)", fontWeight: 600 }}>
+              {scanning ? <Spinner size={14} /> : <Icon name="radar" size={14} />} Scan all domains
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

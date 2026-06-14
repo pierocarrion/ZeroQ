@@ -1,64 +1,54 @@
 import { NextRequest, NextResponse } from "next/server";
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
-import { resolve } from "path";
-import { config } from "@/lib/config";
+import { getSetting, setSetting } from "@/lib/db/settings";
+import { getDb } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const DATA_DIR = resolve(process.cwd(), "data");
-const SELECTED_REPOS_PATH = resolve(DATA_DIR, "selected-repos.json");
-
-function readSelectedRepos(): string[] {
-  try {
-    const raw = readFileSync(SELECTED_REPOS_PATH, "utf8");
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed.selectedRepos)) {
-      return parsed.selectedRepos
-        .map((s: any) => String(s ?? "").trim())
-        .filter((s: string) => s.length > 0);
-    }
-  } catch {
-    // File missing or unreadable — return empty list.
-  }
-  return [];
+function getSelectedRepos(): string[] {
+  const rows = getDb().prepare("SELECT repo FROM selected_repos ORDER BY repo").all() as { repo: string }[];
+  return rows.map((r) => r.repo).filter(Boolean);
 }
 
-function writeSelectedRepos(repos: string[]) {
+function setSelectedRepos(repos: string[]) {
+  const db = getDb();
+  db.prepare("DELETE FROM selected_repos").run();
+  const insert = db.prepare("INSERT INTO selected_repos (repo) VALUES (?)");
+  for (const repo of repos) {
+    const trimmed = String(repo ?? "").trim();
+    if (trimmed) insert.run(trimmed);
+  }
+}
+
+function pick(body: Record<string, any>, existingKey: string, bodyValue?: any, fallback?: string): string {
+  if (bodyValue !== undefined) return String(bodyValue ?? "");
   try {
-    mkdirSync(DATA_DIR, { recursive: true });
-  } catch { /* ignore */ }
-  const normalized = repos
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-  writeFileSync(
-    SELECTED_REPOS_PATH,
-    JSON.stringify({ selectedRepos: normalized }, null, 2) + "\n",
-    "utf8"
-  );
+    const existing = getSetting(existingKey);
+    if (existing !== undefined) return existing;
+  } catch {}
+  return fallback ?? "";
 }
 
 // GET /api/onboarding/config
-// Returns current environment values (for pre-filling the wizard).
+// Returns current values from the local SQLite database.
 export async function GET() {
   return NextResponse.json({
     ok: true,
-    githubOrg: config.github.org ?? "",
-    selectedRepos: readSelectedRepos(),
-    splunkHecUrl: config.splunk.hecUrl ?? "",
-    splunkHecToken: config.splunk.hecToken ?? "",
-    splunkBaseUrl: config.splunk.baseUrl ?? "",
-    splunkUsername: config.splunk.username ?? "",
-    splunkPassword: config.splunk.password ?? "",
-    splunkSkipTlsVerify: config.splunk.skipTlsVerify ? "true" : "",
-    deepseekApiKey: config.ai.apiKey ?? "",
-    aiProvider: config.ai.provider ?? "deepseek",
+    githubOrg: getSetting("GITHUB_ORG") ?? "",
+    selectedRepos: getSelectedRepos(),
+    splunkHecUrl: getSetting("SPLUNK_HEC_URL") ?? "",
+    splunkHecToken: getSetting("SPLUNK_HEC_TOKEN") ?? "",
+    splunkBaseUrl: getSetting("SPLUNK_BASE_URL") ?? "",
+    splunkUsername: getSetting("SPLUNK_USERNAME") ?? "",
+    splunkPassword: getSetting("SPLUNK_PASSWORD") ?? "",
+    splunkSkipTlsVerify: getSetting("SPLUNK_SKIP_TLS_VERIFY") ?? "",
+    deepseekApiKey: getSetting("DEEPSEEK_API_KEY") ?? "",
+    aiProvider: getSetting("AI_PROVIDER") ?? "deepseek",
   });
 }
 
 // POST /api/onboarding/config
-// Writes .env.local, merging with existing values so partial updates
-// (e.g. saving only selectedRepos) do not erase other settings.
+// Persists configuration into the local SQLite database.
 export async function POST(req: NextRequest) {
   let body: Record<string, any>;
   try {
@@ -66,71 +56,34 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ ok: false, error: "Invalid body" }, { status: 400 });
   }
+  console.log("[api/onboarding/config] POST body keys:", Object.keys(body));
 
-  // Persist selected repositories independently so changes are visible
-  // immediately without restarting the dev server.
   if (Array.isArray(body.selectedRepos)) {
-    writeSelectedRepos(body.selectedRepos);
+    setSelectedRepos(body.selectedRepos);
   }
 
-  const envPath = resolve(process.cwd(), ".env.local");
-
-  // Read existing env file so we can merge rather than overwrite.
-  const existing: Record<string, string> = {};
-  try {
-    const current = readFileSync(envPath, "utf8");
-    for (const line of current.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#")) continue;
-      const idx = trimmed.indexOf("=");
-      if (idx === -1) continue;
-      const key = trimmed.slice(0, idx).trim();
-      const value = trimmed.slice(idx + 1).trim();
-      existing[key] = value;
-    }
-  } catch {
-    // File may not exist yet; start empty.
-  }
-
-  const pick = (key: string, bodyValue?: any, fallback?: string) => {
-    if (bodyValue !== undefined) return String(bodyValue ?? "");
-    if (existing[key] !== undefined) return existing[key];
-    return fallback ?? "";
+  const save = (key: string, value?: any, fallback?: string) => {
+    setSetting(key, pick(body, key, value, fallback));
   };
 
-  const lines = [
-    "# ZeroQ — environment configuration",
-    "# Generated by onboarding wizard",
-    "",
-  ];
+  save("DEEPSEEK_API_KEY", body.deepseekApiKey);
+  save("DEEPSEEK_MODEL", body.deepseekModel, "deepseek-chat");
+  save("AI_PROVIDER", body.aiProvider, "deepseek");
+  save("GITHUB_ORG", body.githubOrg);
+  save("GITHUB_TOKEN", body.githubToken);
+  save("GITLAB_TOKEN", body.gitlabToken);
+  save("SPLUNK_HEC_URL", body.splunkHecUrl);
+  save("SPLUNK_HEC_TOKEN", body.splunkHecToken);
+  save("SPLUNK_INDEX_SOURCE", body.splunkIndexSource, "crypto_source");
+  save("SPLUNK_BASE_URL", body.splunkBaseUrl);
+  save("SPLUNK_USERNAME", body.splunkUsername);
+  save("SPLUNK_PASSWORD", body.splunkPassword);
+  save("SPLUNK_SKIP_TLS_VERIFY", body.splunkSkipTlsVerify);
+  save("SPLUNK_INDEX_NET", body.splunkIndexNet, "crypto_net");
+  save("SPLUNK_INDEX_PKI", body.splunkIndexPki, "crypto_pki");
+  save("SPLUNK_INDEX_HNDL", body.splunkIndexHndl, "crypto_hndl");
+  save("SPLUNK_INDEX_PLAN", body.splunkIndexPlan, "crypto_plan");
+  save("SCAN_MAX_FILES", body.scanMaxFiles, "80");
 
-  const add = (key: string, value: string) => {
-    lines.push(`${key}=${value}`);
-  };
-
-  add("DEEPSEEK_API_KEY", pick("DEEPSEEK_API_KEY", body.deepseekApiKey, existing["DEEPSEEK_API_KEY"]));
-  add("DEEPSEEK_MODEL", pick("DEEPSEEK_MODEL", body.deepseekModel, existing["DEEPSEEK_MODEL"]) || "deepseek-chat");
-  add("AI_PROVIDER", pick("AI_PROVIDER", body.aiProvider, existing["AI_PROVIDER"]) || "deepseek");
-  add("GITHUB_ORG", pick("GITHUB_ORG", body.githubOrg, existing["GITHUB_ORG"]));
-  add("GITHUB_TOKEN", pick("GITHUB_TOKEN", body.githubToken, existing["GITHUB_TOKEN"]));
-  add("GITLAB_TOKEN", pick("GITLAB_TOKEN", body.gitlabToken, existing["GITLAB_TOKEN"]));
-  add("SPLUNK_HEC_URL", pick("SPLUNK_HEC_URL", body.splunkHecUrl, existing["SPLUNK_HEC_URL"]));
-  add("SPLUNK_HEC_TOKEN", pick("SPLUNK_HEC_TOKEN", body.splunkHecToken, existing["SPLUNK_HEC_TOKEN"]));
-  add("SPLUNK_INDEX_SOURCE", pick("SPLUNK_INDEX_SOURCE", body.splunkIndexSource, existing["SPLUNK_INDEX_SOURCE"]) || "crypto_source");
-  add("SPLUNK_BASE_URL", pick("SPLUNK_BASE_URL", body.splunkBaseUrl, existing["SPLUNK_BASE_URL"]));
-  add("SPLUNK_USERNAME", pick("SPLUNK_USERNAME", body.splunkUsername, existing["SPLUNK_USERNAME"]));
-  add("SPLUNK_PASSWORD", pick("SPLUNK_PASSWORD", body.splunkPassword, existing["SPLUNK_PASSWORD"]));
-  add("SPLUNK_SKIP_TLS_VERIFY", pick("SPLUNK_SKIP_TLS_VERIFY", body.splunkSkipTlsVerify, existing["SPLUNK_SKIP_TLS_VERIFY"]));
-  add("SPLUNK_INDEX_NET", pick("SPLUNK_INDEX_NET", body.splunkIndexNet, existing["SPLUNK_INDEX_NET"]) || "crypto_net");
-  add("SPLUNK_INDEX_PKI", pick("SPLUNK_INDEX_PKI", body.splunkIndexPki, existing["SPLUNK_INDEX_PKI"]) || "crypto_pki");
-  add("SPLUNK_INDEX_HNDL", pick("SPLUNK_INDEX_HNDL", body.splunkIndexHndl, existing["SPLUNK_INDEX_HNDL"]) || "crypto_hndl");
-  add("SPLUNK_INDEX_PLAN", pick("SPLUNK_INDEX_PLAN", body.splunkIndexPlan, existing["SPLUNK_INDEX_PLAN"]) || "crypto_plan");
-  add("SCAN_MAX_FILES", pick("SCAN_MAX_FILES", body.scanMaxFiles, existing["SCAN_MAX_FILES"]) || "80");
-
-  try {
-    writeFileSync(envPath, lines.join("\n") + "\n", "utf8");
-    return NextResponse.json({ ok: true, message: "Configuration saved. Please restart the app (npm run dev) for env changes to take effect. Selected repositories are active immediately." });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message || "Failed to write config" }, { status: 500 });
-  }
+  return NextResponse.json({ ok: true, message: "Configuration saved." });
 }
